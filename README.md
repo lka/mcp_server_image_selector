@@ -29,7 +29,7 @@ Dieses Projekt stellt einen MCP-kompatiblen Server bereit, mit dem sich interakt
 - Exportierte Dateien werden im aktuellen Arbeitsverzeichnis abgelegt.
 
 ## Konfiguration
-Die Datei `.vscode/mcp.json` enthält die Konfiguration für die Integration in MCP-Umgebungen.
+Die Datei `claude_desktop_config.json` enthält die Konfiguration für die Integration in MCP-Umgebungen.
 
 ## Lizenz
 MIT License
