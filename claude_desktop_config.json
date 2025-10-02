@@ -1,0 +1,9 @@
+{
+    "mcpServers": {
+        "image-selector": {
+            "command": "python",
+            "args": ["./mcp_server_image_selector/server.py"],
+            "env": {"IMAGE_SELECTOR_WORKING_DIR": "."}
+        }
+    }
+}

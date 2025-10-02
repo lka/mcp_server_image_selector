@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-server-image-selector"
+version = "1.0.0"
+description = "MCP Server für Image Auswahl unter Windows 11"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [
+    {name = "MCP Image Selector Server"},
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "Pillow>=10.0.0",
+]
+
+[project.scripts]
+mcp-server-image-selector = "mcp_server_image_selector.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# [tool.setuptools]
+# packages = ["mcp_server_image_selector"]
+
+[tool.setuptools.package-data]
+mcp_server_image_selector = ["*.py"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
