@@ -1,0 +1,7 @@
+pytest>=7.0
+pytest-cov
+flake8
+black
+isort
+mypy
+pillow

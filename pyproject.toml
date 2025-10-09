@@ -17,6 +17,16 @@ dependencies = [
     "Pillow>=10.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "flake8",
+    "black",
+    "isort",
+    "mypy",
+]
+
 [project.scripts]
 mcp-server-image-selector = "mcp_server_image_selector.server:main"
 

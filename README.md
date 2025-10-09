@@ -31,5 +31,17 @@ Dieses Projekt stellt einen MCP-kompatiblen Server bereit, mit dem sich interakt
 ## Konfiguration
 Die Datei `claude_desktop_config.json` enthält die Konfiguration für die Integration in MCP-Umgebungen.
 
+## Tests / CI
+- Tests werden mit `pytest` ausgeführt.
+- Ein GitHub Actions Workflow (`.github/workflows/ci.yml`) führt Tests bei Push/PR auf `main` aus.
+
+Um lokal zu testen:
+```powershell
+venv\Scripts\activate
+pip install -r requirements.txt  # optional
+pip install pytest pillow
+pytest -q
+```
+
 ## Lizenz
 MIT License

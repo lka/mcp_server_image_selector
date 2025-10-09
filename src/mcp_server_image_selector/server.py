@@ -9,28 +9,45 @@ from tkinter import messagebox
 from PIL import Image, ImageTk
 import os
 # import json
+from typing import Any, List
 from datetime import datetime
 # from pathlib import Path
 import sys
 
 # MCP imports
-from mcp.server import Server
-from mcp.types import Tool, TextContent  # , ImageContent, EmbeddedResource
-import mcp.server.stdio
+try:
+    from mcp.server import Server
+    from mcp.types import Tool, TextContent  # , ImageContent, EmbeddedResource
+    import mcp.server.stdio  # type: ignore
+except Exception:
+    # MCP package not available in test environment; define placeholders
+    Server = None
+    Tool = None
+    TextContent = None
+    # ensure submodule names exist to avoid import errors elsewhere
+    try:
+        import mcp.server.stdio  # type: ignore
+    except Exception:
+        pass
 
 
 class ImageSelectorGUI:
     """GUI-Komponente für die Bildauswahl"""
 
-    def __init__(self, image_path: str, working_dir: str):
+    def __init__(self, image_path: str, working_dir: str, create_ui: bool = True):
         self.image_path = image_path
         self.working_dir = working_dir
         self.regions = []
         self.result_ready = False
+        self.create_ui = create_ui
 
-        self.root = tk.Tk()
-        self.root.title(f"Bildausschnitt-Selector - {os.path.basename(image_path)}")
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        # GUI root and widgets are only created when create_ui is True.
+        if self.create_ui:
+            self.root = tk.Tk()
+            self.root.title(f"Bildausschnitt-Selector - {os.path.basename(image_path)}")
+            self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        else:
+            self.root = None
 
         # Variablen
         self.image = None
@@ -43,13 +60,36 @@ class ImageSelectorGUI:
         self.start_x = None
         self.start_y = None
         self.current_rect = None
-        self.selection_mode = tk.StringVar(value="foto")
+        # Only create tkinter variables when GUI is enabled
+        if self.create_ui:
+            self.selection_mode = tk.StringVar(value="foto")
+        else:
+            # lightweight dummy with get() method used by the code
+            class _DummyVar:
+                def __init__(self, v="foto"):
+                    self._v = v
+
+                def get(self):
+                    return self._v
+
+            self.selection_mode = _DummyVar("foto")
         self.current_selection = None
 
-        self._setup_ui()
+        if self.create_ui:
+            self._setup_ui()
+        # Always load the image data; display is conditional
         self._load_image()
 
-    def _setup_ui(self):
+    @staticmethod
+    def compute_scale(img_width: int, img_height: int, canvas_width: int, canvas_height: int) -> float:
+        """Berechnet den Skalierungsfaktor für ein Bild, begrenzt auf max 1.0."""
+        if img_width <= 0 or img_height <= 0:
+            return 1.0
+        scale_x = canvas_width / img_width
+        scale_y = canvas_height / img_height
+        return min(scale_x, scale_y, 1.0)
+
+    def _setup_ui(self):  # pragma: no cover
         """Erstellt die Benutzeroberfläche"""
         # Toolbar
         toolbar = tk.Frame(self.root, relief=tk.RAISED, borderwidth=2)
@@ -159,18 +199,31 @@ Anleitung:
             padx=5, pady=5
         )
 
-    def _load_image(self):
+    def _load_image(self):  # pragma: no cover
         """Lädt das Bild"""
         try:
             self.original_image = Image.open(self.image_path)
-            self._display_image()
+            # If GUI is created, display on canvas. Otherwise compute scale only.
+            if self.create_ui:
+                self._display_image()
+            else:
+                # use default canvas fallback sizes as in _display_image
+                canvas_width = 1280
+                canvas_height = 1024
+                img_width, img_height = self.original_image.size
+                self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
+                # Precompute a resized image for downstream processing if desired
+                new_width = int(img_width * self.scale_factor)
+                new_height = int(img_height * self.scale_factor)
+                self.image = self.original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         except Exception as e:
             messagebox.showerror("Fehler", f"Bild konnte nicht geladen werden: {e}")
             self.root.destroy()
 
-    def _display_image(self):
+    def _display_image(self):  # pragma: no cover
         """Zeigt das Bild auf dem Canvas an"""
         if self.original_image:
+            # Skalierung berechnen
             # Skalierung berechnen
             self.root.update()
             canvas_width = self.canvas.winfo_width()
@@ -182,17 +235,12 @@ Anleitung:
                 canvas_height = 1024
 
             img_width, img_height = self.original_image.size
-
-            scale_x = canvas_width / img_width
-            scale_y = canvas_height / img_height
-            self.scale_factor = min(scale_x, scale_y, 1.0)
+            self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
 
             new_width = int(img_width * self.scale_factor)
             new_height = int(img_height * self.scale_factor)
 
-            self.image = self.original_image.resize(
-                (new_width, new_height), Image.Resampling.LANCZOS
-            )
+            self.image = self.original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
             self.photo = ImageTk.PhotoImage(self.image)
 
             self.canvas.config(scrollregion=(0, 0, new_width, new_height))
@@ -201,7 +249,7 @@ Anleitung:
                 0, 0, anchor=tk.NW, image=self.photo
             )
 
-    def on_mouse_down(self, event):
+    def on_mouse_down(self, event):  # pragma: no cover
         """Maus-Klick Event"""
         if self.image:
             self.start_x = self.canvas.canvasx(event.x)
@@ -210,7 +258,7 @@ Anleitung:
             if self.current_rect:
                 self.canvas.delete(self.current_rect)
 
-    def on_mouse_drag(self, event):
+    def on_mouse_drag(self, event):  # pragma: no cover
         """Maus-Zieh Event"""
         if self.image and self.start_x is not None:
             cur_x = self.canvas.canvasx(event.x)
@@ -231,7 +279,7 @@ Anleitung:
                 dash=(5, 5),
             )
 
-    def on_mouse_up(self, event):
+    def on_mouse_up(self, event):  # pragma: no cover
         """Maus-Loslassen Event"""
         if self.image and self.start_x is not None:
             end_x = self.canvas.canvasx(event.x)
@@ -286,7 +334,7 @@ Anleitung:
         self.current_rect = None
         self.current_selection = None
 
-    def clear_regions(self):
+    def clear_regions(self):  # pragma: no cover
         """Löscht alle gespeicherten Bereiche"""
         if self.regions:
             if messagebox.askyesno("Bestätigen", "Alle Bereiche löschen?"):
@@ -297,7 +345,7 @@ Anleitung:
                 self.region_listbox.delete(0, tk.END)
                 self.status_bar.config(text="Alle Bereiche gelöscht")
 
-    def finish_selection(self):
+    def finish_selection(self):  # pragma: no cover
         """Beendet die Auswahl und exportiert"""
         if not self.regions:
             messagebox.showwarning(
@@ -312,7 +360,7 @@ Anleitung:
             self.root.quit()
             self.root.destroy()
 
-    def on_closing(self):
+    def on_closing(self):  # pragma: no cover
         """Wird beim Schließen des Fensters aufgerufen"""
         if messagebox.askokcancel(
             "Beenden",
@@ -329,46 +377,46 @@ Anleitung:
 
 
 # MCP Server Setup
-app = Server("image-selector")
+if Server is not None and getattr(Server, "__name__", "") != "object":
+    app = Server("image-selector")
 
-
-@app.list_tools()
-async def list_tools() -> list[Tool]:
-    """Liste verfügbarer Tools"""
-    return [
-        Tool(
-            name="select_image_regions",
-            description="Öffnet eine GUI zum interaktiven Auswählen von Bildausschnitten. "
-            "Bereiche können als 'foto' oder 'text' markiert werden. "
-            "Nach Abschluss werden die Bereiche automatisch exportiert.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "image_path": {
-                        "type": "string",
-                        "description": "Pfad zum Bild (relativ zum Working Directory oder absolut)",
-                    }
+    @app.list_tools()
+    async def list_tools() -> List[Any]:
+        """Liste verfügbarer Tools"""
+        return [
+            Tool(
+                name="select_image_regions",
+                description="Öffnet eine GUI zum interaktiven Auswählen von Bildausschnitten. "
+                "Bereiche können als 'foto' oder 'text' markiert werden. "
+                "Nach Abschluss werden die Bereiche automatisch exportiert.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "image_path": {
+                            "type": "string",
+                            "description": "Pfad zum Bild (relativ zum Working Directory oder absolut)",
+                        }
+                    },
+                    "required": ["image_path"],
                 },
-                "required": ["image_path"],
-            },
-        ),
-        Tool(
-            name="list_exported_regions",
-            description="Listet alle exportierten Bildausschnitte aus dem Working Directory auf",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        Tool(
-            name="get_working_directory",
-            description="Zeigt das aktuelle Working Directory an",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-    ]
+            ),
+            Tool(
+                name="list_exported_regions",
+                description="Listet alle exportierten Bildausschnitte aus dem Working Directory auf",
+                inputSchema={
+                    "type": "object",
+                    "properties": {},
+                },
+            ),
+            Tool(
+                name="get_working_directory",
+                description="Zeigt das aktuelle Working Directory an",
+                inputSchema={
+                    "type": "object",
+                    "properties": {},
+                },
+            ),
+        ]
 
 
 def get_working_dir() -> str:
@@ -377,6 +425,35 @@ def get_working_dir() -> str:
     working_dir = os.environ.get("IMAGE_SELECTOR_WORKING_DIR", os.getcwd())
     os.makedirs(working_dir, exist_ok=True)
     return working_dir
+
+
+def create_tmp_dir_if_needed(base_dir: str) -> str:
+    """Erstellt ein temporäres Verzeichnis, falls nötig"""
+    tmp_dir = os.path.join(base_dir, "tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    return tmp_dir
+
+
+def transform_coords(coords: tuple, scale_factor: float) -> tuple:
+    """Transformiert Display-Koordinaten zurück auf Original-Koordinaten mithilfe des scale_factors."""
+    x1, y1, x2, y2 = coords
+    if scale_factor == 0:
+        raise ValueError("scale_factor must be non-zero")
+    return (int(x1 / scale_factor), int(y1 / scale_factor), int(x2 / scale_factor), int(y2 / scale_factor))
+
+
+def format_export_paths(base_name: str, timestamp: str, i: int, mode: str, working_dir: str) -> dict:
+    """Erzeugt die Ausgabe-Pfade für einen exportierten Bereich.
+
+    Rückgabe: dict mit keys abhängig vom Modus ('foto' -> file, 'text' -> image_file,text_file).
+    """
+    if mode == "foto":
+        output_file = os.path.join(working_dir, f"{base_name}_{timestamp}_region{i:02d}_foto.png")
+        return {"type": "foto", "file": output_file, "region": i}
+    else:
+        img_file = os.path.join(working_dir, f"{base_name}_{timestamp}_region{i:02d}_text.png")
+        text_file = os.path.join(working_dir, f"{base_name}_{timestamp}_region{i:02d}_text.txt")
+        return {"type": "text", "image_file": img_file, "text_file": text_file, "region": i}
 
 
 def export_regions(image_path: str, regions: list, working_dir: str) -> dict:
@@ -404,40 +481,23 @@ def export_regions(image_path: str, regions: list, working_dir: str) -> dict:
         # Hier vereinfachte Annahme - in Produktion scale_factor übergeben
 
         try:
+            # crop using provided coordinates
             crop = original_image.crop((int(x1), int(y1), int(x2), int(y2)))
 
-            if mode == "foto":
-                output_file = os.path.join(
-                    working_dir, f"{base_name}_{timestamp}_region{i:02d}_foto.png"
-                )
-                crop.save(output_file, "PNG")
-                exported_files.append(
-                    {"type": "foto", "file": output_file, "region": i}
-                )
+            info = format_export_paths(base_name, timestamp, i, mode, working_dir)
 
-            else:  # text
-                img_file = os.path.join(
-                    working_dir, f"{base_name}_{timestamp}_region{i:02d}_text.png"
-                )
-                crop.save(img_file, "PNG")
-
-                text_file = os.path.join(
-                    working_dir, f"{base_name}_{timestamp}_region{i:02d}_text.txt"
-                )
-                with open(text_file, "w", encoding="utf-8") as f:
+            if info["type"] == "foto":
+                crop.save(info["file"], "PNG")
+                exported_files.append(info)
+            else:
+                crop.save(info["image_file"], "PNG")
+                with open(info["text_file"], "w", encoding="utf-8") as f:
                     f.write(f"Textbereich {i}\n")
-                    f.write(f"Bildquelle: {img_file}\n")
+                    f.write(f"Bildquelle: {info['image_file']}\n")
                     f.write(f"Original: {image_path}\n")
                     f.write("\n[OCR-Text hier einfügen]\n")
+                exported_files.append(info)
 
-                exported_files.append(
-                    {
-                        "type": "text",
-                        "image_file": img_file,
-                        "text_file": text_file,
-                        "region": i,
-                    }
-                )
         except Exception as e:
             print(f"Fehler beim Export von Region {i}: {e}", file=sys.stderr)
 
@@ -449,102 +509,98 @@ def export_regions(image_path: str, regions: list, working_dir: str) -> dict:
     }
 
 
-@app.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Tool-Aufrufe verarbeiten"""
+if 'app' in globals():
+    @app.call_tool()
+    async def call_tool(name: str, arguments: dict) -> List[Any]:
+        """Tool-Aufrufe verarbeiten"""
 
-    working_dir = get_working_dir()
+        working_dir = get_working_dir()
+        export_dir = create_tmp_dir_if_needed(working_dir)
 
-    if name == "get_working_directory":
-        return [TextContent(type="text", text=f"Working Directory: {working_dir}")]
+        if name == "get_working_directory":
+            return [TextContent(type="text", text=f"Working Directory: {working_dir}")]
 
-    elif name == "list_exported_regions":
-        files = []
-        for file in os.listdir(working_dir):
-            if file.endswith((".png", ".txt")):
-                files.append(file)
+        elif name == "list_exported_regions":
+            files = []
+            for file in os.listdir(export_dir):
+                if file.endswith((".png", ".txt")):
+                    files.append(file)
 
-        files.sort()
+            files.sort()
 
-        result = f"Exportierte Dateien in {working_dir}:\n\n"
-        if files:
-            result += "\n".join(f"  - {f}" for f in files)
-        else:
-            result += "  (keine Dateien gefunden)"
-
-        return [TextContent(type="text", text=result)]
-
-    elif name == "select_image_regions":
-        image_path = arguments.get("image_path")
-
-        if not image_path:
-            return [TextContent(type="text", text="Fehler: image_path erforderlich")]
-
-        # Relativen Pfad auflösen
-        if not os.path.isabs(image_path):
-            image_path = os.path.join(working_dir, image_path)
-
-        if not os.path.exists(image_path):
-            return [
-                TextContent(
-                    type="text", text=f"Fehler: Bild nicht gefunden: {image_path}"
-                )
-            ]
-
-        # GUI in separatem Thread starten (Tkinter braucht Main-Thread)
-        # Für MCP verwenden wir einen synchronen Ansatz
-        try:
-            gui = ImageSelectorGUI(image_path, working_dir)
-            regions = gui.run()
-
-            if regions:
-                # Exportieren mit scale_factor aus GUI
-                scale_factor = gui.scale_factor
-
-                # Koordinaten umrechnen
-                for region in regions:
-                    x1, y1, x2, y2 = region["coords"]
-                    region["coords"] = (
-                        int(x1 / scale_factor),
-                        int(y1 / scale_factor),
-                        int(x2 / scale_factor),
-                        int(y2 / scale_factor),
-                    )
-
-                result = export_regions(image_path, regions, working_dir)
-
-                response = (
-                    f"✓ Erfolgreich {result['exported_count']} Bereiche exportiert:\n\n"
-                )
-                for file_info in result["files"]:
-                    if file_info["type"] == "foto":
-                        response += f"  Region {file_info['region']} (FOTO): {os.path.basename(file_info['file'])}\n"
-                    else:
-                        response += f"  Region {file_info['region']} (TEXT):\n"
-                        response += (
-                            f"    - Bild: {os.path.basename(file_info['image_file'])}\n"
-                        )
-                        response += (
-                            f"    - Text: {os.path.basename(file_info['text_file'])}\n"
-                        )
-
-                response += f"\nAusgabeverzeichnis: {working_dir}"
-
-                return [TextContent(type="text", text=response)]
+            result = f"Exportierte Dateien in {export_dir}:\n\n"
+            if files:
+                result += "\n".join(f"  - {f}" for f in files)
             else:
+                result += "  (keine Dateien gefunden)"
+
+            return [TextContent(type="text", text=result)]
+
+        elif name == "select_image_regions":
+            image_path = arguments.get("image_path")
+
+            if not image_path:
+                return [TextContent(type="text", text="Fehler: image_path erforderlich")]
+
+            # Relativen Pfad auflösen
+            if not os.path.isabs(image_path):
+                image_path = os.path.join(working_dir, image_path)
+
+            if not os.path.exists(image_path):
                 return [
                     TextContent(
-                        type="text",
-                        text="Auswahl abgebrochen - keine Bereiche exportiert",
+                        type="text", text=f"Fehler: Bild nicht gefunden: {image_path}"
                     )
                 ]
 
-        except Exception as e:
-            return [
-                TextContent(type="text", text=f"Fehler beim Öffnen der GUI: {str(e)}")
-            ]
+            # GUI in separatem Thread starten (Tkinter braucht Main-Thread)
+            # Für MCP verwenden wir einen synchronen Ansatz
+            try:
+                gui = ImageSelectorGUI(image_path, export_dir)
+                regions = gui.run()
 
-    return [TextContent(type="text", text=f"Unbekanntes Tool: {name}")]
+                if regions:
+                    # Exportieren mit scale_factor aus GUI
+                    scale_factor = gui.scale_factor
+
+                    # Koordinaten umrechnen
+                    for region in regions:
+                        region["coords"] = transform_coords(region["coords"], scale_factor)
+
+                    result = export_regions(image_path, regions, export_dir)
+
+                    response = (
+                        f"✓ Erfolgreich {result['exported_count']} Bereiche exportiert:\n\n"
+                    )
+                    for file_info in result["files"]:
+                        if file_info["type"] == "foto":
+                            response += f"  Region {file_info['region']} (FOTO): {os.path.basename(file_info['file'])}\n"
+                        else:
+                            response += f"  Region {file_info['region']} (TEXT):\n"
+                            response += (
+                                f"    - Bild: {os.path.basename(file_info['image_file'])}\n"
+                            )
+                            response += (
+                                f"    - Text: {os.path.basename(file_info['text_file'])}\n"
+                            )
+
+                    response += f"\nAusgabeverzeichnis: {export_dir}"
+
+                    return [TextContent(type="text", text=response)]
+                else:
+                    return [
+                        TextContent(
+                            type="text",
+                            text="Auswahl abgebrochen - keine Bereiche exportiert",
+                        )
+                    ]
+
+            except Exception as e:
+                return [
+                    TextContent(type="text", text=f"Fehler beim Öffnen der GUI: {str(e)}")
+                ]
+
+        return [TextContent(type="text", text=f"Unbekanntes Tool: {name}")]
 
 
 async def main():
