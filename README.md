@@ -1,10 +1,11 @@
 # MCP Server Image Selector
 
-Dieses Projekt stellt einen MCP-kompatiblen Server bereit, mit dem sich interaktiv Bildausschnitte aus Bildern (z.B. JPEG, PNG) auswählen und als separate Dateien exportieren lassen.
+Dieses Projekt stellt einen MCP-kompatiblen Server bereit, mit dem sich interaktiv Bildausschnitte aus Bildern (z.B. JPEG, PNG) und PDF-Dateien auswählen und als separate Dateien exportieren lassen.
 
 ## Features
 - Interaktive GUI zur Auswahl von Bild- und Textregionen
 - Unterstützung für verschiedene Bildformate (JPEG, PNG)
+- **PDF-Unterstützung**: Automatische Extraktion von eingebetteten Bildern oder Rendering der ersten Seite
 - Export der ausgewählten Regionen als Bild- und/oder Textdateien
 - Automatische Benennung und Ablage der Exportdateien
 - Integration in MCP-Workflows
@@ -24,7 +25,8 @@ Dieses Projekt stellt einen MCP-kompatiblen Server bereit, mit dem sich interakt
    ```
 
 ## Benutzung
-- Nach dem Start kann über die GUI ein Bild geöffnet werden.
+- Nach dem Start kann über die GUI ein Bild oder PDF geöffnet werden.
+- Bei PDF-Dateien wird automatisch das erste eingebettete Bild extrahiert oder die erste Seite als Bild gerendert.
 - Mit der Maus können Regionen markiert und als Foto oder Text exportiert werden.
 - Exportierte Dateien werden im aktuellen Arbeitsverzeichnis abgelegt.
 

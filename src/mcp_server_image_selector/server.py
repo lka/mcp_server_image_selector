@@ -9,10 +9,16 @@ from tkinter import messagebox
 from PIL import Image, ImageTk
 import os
 # import json
-from typing import Any, List
+from typing import Any, List, Optional
 from datetime import datetime
 # from pathlib import Path
 import sys
+import tempfile
+
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
 
 # MCP imports
 try:
@@ -31,11 +37,86 @@ except Exception:
         pass
 
 
+def extract_image_from_pdf(pdf_path: str, output_dir: Optional[str] = None) -> Optional[str]:
+    """
+    Extrahiert das erste Bild aus einem PDF oder erstellt ein Rendering der ersten Seite.
+
+    Args:
+        pdf_path: Pfad zur PDF-Datei
+        output_dir: Optional - Verzeichnis für das extrahierte Bild. Wenn None, wird tempfile verwendet.
+
+    Returns:
+        Pfad zum extrahierten Bild oder None bei Fehler
+    """
+    if fitz is None:
+        raise ImportError("PyMuPDF (fitz) ist nicht installiert. Bitte installieren: pip install PyMuPDF")
+
+    try:
+        doc = fitz.open(pdf_path)
+        if len(doc) == 0:
+            return None
+
+        page = doc[0]  # Erste Seite
+
+        # Versuche zunächst, eingebettete Bilder zu extrahieren
+        image_list = page.get_images(full=True)
+
+        if image_list:
+            # Nimm das erste Bild
+            xref = image_list[0][0]
+            base_image = doc.extract_image(xref)
+            image_bytes = base_image["image"]
+
+            # Speichere das Bild temporär
+            if output_dir is None:
+                output_dir = tempfile.gettempdir()
+
+            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+            output_path = os.path.join(output_dir, f"{base_name}_extracted.png")
+
+            with open(output_path, "wb") as img_file:
+                img_file.write(image_bytes)
+
+            doc.close()
+            return output_path
+        else:
+            # Kein eingebettetes Bild gefunden - rendere die Seite als Bild
+            # Hohe Auflösung für bessere Qualität
+            mat = fitz.Matrix(2.0, 2.0)  # 2x Zoom = 144 DPI
+            pix = page.get_pixmap(matrix=mat)
+
+            if output_dir is None:
+                output_dir = tempfile.gettempdir()
+
+            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+            output_path = os.path.join(output_dir, f"{base_name}_rendered.png")
+
+            pix.save(output_path)
+            doc.close()
+            return output_path
+
+    except Exception as e:
+        print(f"Fehler beim Extrahieren des Bildes aus PDF: {e}", file=sys.stderr)
+        return None
+
+
 class ImageSelectorGUI:
     """GUI-Komponente für die Bildauswahl"""
 
     def __init__(self, image_path: str, working_dir: str, create_ui: bool = True):
-        self.image_path = image_path
+        self.original_image_path = image_path
+        self.is_pdf = image_path.lower().endswith('.pdf')
+        self.extracted_image_path = None
+
+        # Wenn PDF, extrahiere das Bild zuerst
+        if self.is_pdf:
+            self.extracted_image_path = extract_image_from_pdf(image_path, working_dir)
+            if self.extracted_image_path is None:
+                raise ValueError(f"Konnte kein Bild aus PDF extrahieren: {image_path}")
+            self.image_path = self.extracted_image_path
+        else:
+            self.image_path = image_path
+
         self.working_dir = working_dir
         self.regions = []
         self.result_ready = False
@@ -44,7 +125,10 @@ class ImageSelectorGUI:
         # GUI root and widgets are only created when create_ui is True.
         if self.create_ui:
             self.root = tk.Tk()
-            self.root.title(f"Bildausschnitt-Selector - {os.path.basename(image_path)}")
+            title_name = os.path.basename(self.original_image_path)
+            if self.is_pdf:
+                title_name += " (PDF)"
+            self.root.title(f"Bildausschnitt-Selector - {title_name}")
             self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         else:
             self.root = None
@@ -473,6 +557,8 @@ if Server is not None and getattr(Server, "__name__", "") != "object":
             Tool(
                 name="select_image_regions",
                 description="Öffnet eine GUI zum interaktiven Auswählen von Bildausschnitten. "
+                "Unterstützt Bildformate (JPEG, PNG, etc.) und PDF-Dateien. "
+                "Bei PDFs wird das erste eingebettete Bild extrahiert oder die erste Seite gerendert. "
                 "Bereiche können als 'foto' oder 'text' markiert werden. "
                 "Nach Abschluss werden die Bereiche automatisch exportiert.",
                 inputSchema={
@@ -480,7 +566,7 @@ if Server is not None and getattr(Server, "__name__", "") != "object":
                     "properties": {
                         "image_path": {
                             "type": "string",
-                            "description": "Pfad zum Bild (relativ zum Working Directory oder absolut)",
+                            "description": "Pfad zum Bild oder PDF (relativ zum Working Directory oder absolut)",
                         }
                     },
                     "required": ["image_path"],

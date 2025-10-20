@@ -1,0 +1,6 @@
+Collecting PyMuPDF
+  Downloading pymupdf-1.26.5-cp39-abi3-win_amd64.whl.metadata (3.4 kB)
+Downloading pymupdf-1.26.5-cp39-abi3-win_amd64.whl (18.7 MB)
+   ---------------------------------------- 18.7/18.7 MB 13.0 MB/s eta 0:00:00
+Installing collected packages: PyMuPDF
+Successfully installed PyMuPDF-1.26.5
