@@ -135,6 +135,40 @@ class ImageSelectorGUI:
         )
         clear_btn.pack(side=tk.LEFT, padx=5)
 
+        # Separator
+        tk.Frame(toolbar, width=2, relief=tk.SUNKEN, borderwidth=1).pack(
+            side=tk.LEFT, fill=tk.Y, padx=10
+        )
+
+        # Rotation buttons
+        tk.Label(toolbar, text="Drehen:").pack(side=tk.LEFT, padx=5)
+        rotate_left_btn = tk.Button(
+            toolbar,
+            text="↺ 90° links",
+            command=lambda: self.rotate_image(-90),
+            bg="#FF9800",
+            fg="white",
+        )
+        rotate_left_btn.pack(side=tk.LEFT, padx=2)
+
+        rotate_right_btn = tk.Button(
+            toolbar,
+            text="↻ 90° rechts",
+            command=lambda: self.rotate_image(90),
+            bg="#FF9800",
+            fg="white",
+        )
+        rotate_right_btn.pack(side=tk.LEFT, padx=2)
+
+        rotate_180_btn = tk.Button(
+            toolbar,
+            text="↻ 180°",
+            command=lambda: self.rotate_image(180),
+            bg="#FF9800",
+            fg="white",
+        )
+        rotate_180_btn.pack(side=tk.LEFT, padx=2)
+
         # Canvas Frame
         canvas_frame = tk.Frame(self.root)
         canvas_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -345,6 +379,58 @@ Anleitung:
                 self.region_listbox.delete(0, tk.END)
                 self.status_bar.config(text="Alle Bereiche gelöscht")
 
+    def rotate_image(self, angle: int):  # pragma: no cover
+        """Dreht das Bild um den angegebenen Winkel (90, -90, oder 180 Grad)"""
+        if not self.original_image:
+            return
+
+        # PIL rotate ist gegen den Uhrzeigersinn, aber expand=True passt die Größe an
+        # Für 90° rechts nutzen wir -90
+        if angle == 90:
+            # 90° rechts = -90° in PIL (oder 270° gegen Uhrzeigersinn)
+            self.original_image = self.original_image.rotate(-90, expand=True)
+        elif angle == -90:
+            # 90° links = 90° in PIL
+            self.original_image = self.original_image.rotate(90, expand=True)
+        elif angle == 180:
+            self.original_image = self.original_image.rotate(180, expand=True)
+
+        # Clear current selection and regions when rotating
+        # Only access GUI elements if create_ui is True
+        if self.create_ui:
+            if self.current_rect:
+                self.canvas.delete(self.current_rect)
+                self.current_rect = None
+        else:
+            self.current_rect = None
+
+        self.current_selection = None
+
+        # Delete all saved regions (since they won't match after rotation)
+        if self.regions:
+            if self.create_ui:
+                for region in self.regions:
+                    if region["rect_id"]:
+                        self.canvas.delete(region["rect_id"])
+                self.region_listbox.delete(0, tk.END)
+            self.regions = []
+
+        # Refresh display only if GUI is active
+        if self.create_ui:
+            self._display_image()
+            # Update status
+            rotation_text = "90° rechts" if angle == 90 else ("90° links" if angle == -90 else "180°")
+            self.status_bar.config(text=f"Bild um {rotation_text} gedreht - Bereiche wurden zurückgesetzt")
+        else:
+            # Update scale factor and resized image for non-GUI mode
+            img_width, img_height = self.original_image.size
+            canvas_width = 1280
+            canvas_height = 1024
+            self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
+            new_width = int(img_width * self.scale_factor)
+            new_height = int(img_height * self.scale_factor)
+            self.image = self.original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
     def finish_selection(self):  # pragma: no cover
         """Beendet die Auswahl und exportiert"""
         if not self.regions:
@@ -456,13 +542,26 @@ def format_export_paths(base_name: str, timestamp: str, i: int, mode: str, worki
         return {"type": "text", "image_file": img_file, "text_file": text_file, "region": i}
 
 
-def export_regions(image_path: str, regions: list, working_dir: str) -> dict:
-    """Exportiert die ausgewählten Bereiche"""
+def export_regions(image_path: str, regions: list, working_dir: str, image_object: Image.Image = None) -> dict:
+    """Exportiert die ausgewählten Bereiche
+
+    Args:
+        image_path: Pfad zum Originalbild (für Dateinamen)
+        regions: Liste der zu exportierenden Bereiche
+        working_dir: Ausgabeverzeichnis
+        image_object: Optional - bereits geladenes/gedrehtes PIL Image Objekt.
+                     Wenn None, wird das Bild von image_path geladen.
+    """
 
     base_name = os.path.splitext(os.path.basename(image_path))[0]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    original_image = Image.open(image_path)
+    # Use provided image object if available (e.g., after rotation),
+    # otherwise load from file
+    if image_object is not None:
+        original_image = image_object
+    else:
+        original_image = Image.open(image_path)
 
     # Ermittle scale_factor (falls nötig - hier nehmen wir an, coords sind bereits original)
     # In der GUI werden die Koordinaten bereits umgerechnet
@@ -567,7 +666,8 @@ if 'app' in globals():
                     for region in regions:
                         region["coords"] = transform_coords(region["coords"], scale_factor)
 
-                    result = export_regions(image_path, regions, export_dir)
+                    # Pass the rotated image from GUI to export_regions
+                    result = export_regions(image_path, regions, export_dir, image_object=gui.original_image)
 
                     response = (
                         f"✓ Erfolgreich {result['exported_count']} Bereiche exportiert:\n\n"
