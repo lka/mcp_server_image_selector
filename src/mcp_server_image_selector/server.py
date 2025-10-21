@@ -7,13 +7,13 @@ import asyncio
 import tkinter as tk
 from tkinter import messagebox
 from PIL import Image, ImageTk
+from pathlib import Path
 import os
 # import json
 from typing import Any, List, Optional
 from datetime import datetime
 # from pathlib import Path
 import sys
-import tempfile
 
 try:
     import fitz  # PyMuPDF
@@ -37,13 +37,13 @@ except Exception:
         pass
 
 
-def extract_image_from_pdf(pdf_path: str, output_dir: Optional[str] = None) -> Optional[str]:
+def extract_image_from_pdf(pdf_path: str, working_dir: Optional[str] = None) -> Optional[str]:
     """
     Extrahiert das erste Bild aus einem PDF oder erstellt ein Rendering der ersten Seite.
 
     Args:
         pdf_path: Pfad zur PDF-Datei
-        output_dir: Optional - Verzeichnis für das extrahierte Bild. Wenn None, wird tempfile verwendet.
+        working_dir: Optional - Verzeichnis für das extrahierte Bild. Wenn None, wird ./tmp verwendet.
 
     Returns:
         Pfad zum extrahierten Bild oder None bei Fehler
@@ -61,17 +61,19 @@ def extract_image_from_pdf(pdf_path: str, output_dir: Optional[str] = None) -> O
         # Versuche zunächst, eingebettete Bilder zu extrahieren
         image_list = page.get_images(full=True)
 
+        if working_dir is None:
+            output_dir = create_tmp_dir_if_needed('.')
+        else:
+            output_dir = create_tmp_dir_if_needed(working_dir)
+
+        base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+
         if image_list:
             # Nimm das erste Bild
             xref = image_list[0][0]
             base_image = doc.extract_image(xref)
             image_bytes = base_image["image"]
 
-            # Speichere das Bild temporär
-            if output_dir is None:
-                output_dir = tempfile.gettempdir()
-
-            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
             output_path = os.path.join(output_dir, f"{base_name}_extracted.png")
 
             with open(output_path, "wb") as img_file:
@@ -85,10 +87,6 @@ def extract_image_from_pdf(pdf_path: str, output_dir: Optional[str] = None) -> O
             mat = fitz.Matrix(2.0, 2.0)  # 2x Zoom = 144 DPI
             pix = page.get_pixmap(matrix=mat)
 
-            if output_dir is None:
-                output_dir = tempfile.gettempdir()
-
-            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
             output_path = os.path.join(output_dir, f"{base_name}_rendered.png")
 
             pix.save(output_path)
@@ -110,7 +108,12 @@ class ImageSelectorGUI:
 
         # Wenn PDF, extrahiere das Bild zuerst
         if self.is_pdf:
-            self.extracted_image_path = extract_image_from_pdf(image_path, working_dir)
+            if Path(image_path).is_absolute():
+                self.extracted_image_path = extract_image_from_pdf(image_path,
+                                                                   working_dir)
+            else:
+                self.extracted_image_path = extract_image_from_pdf(os.path.join(working_dir, image_path),
+                                                                   working_dir)
             if self.extracted_image_path is None:
                 raise ValueError(f"Konnte kein Bild aus PDF extrahieren: {image_path}")
             self.image_path = self.extracted_image_path

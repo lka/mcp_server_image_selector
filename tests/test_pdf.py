@@ -180,6 +180,10 @@ def test_image_selector_gui_with_pdf(tmp_path):
     assert gui.extracted_image_path is not None, "Image was not extracted from PDF"
     assert os.path.exists(gui.image_path), "Extracted image does not exist"
 
+    # Verify the extracted image is in the tmp directory
+    expected_tmp_dir = os.path.join(base_dir, "tmp")
+    assert gui.extracted_image_path.startswith(expected_tmp_dir), f"Extracted image should be in tmp dir, got {gui.extracted_image_path}"
+
     # Verify the image was loaded
     assert gui.original_image is not None, "Image was not loaded"
     assert gui.image is not None, "Resized image was not created"
