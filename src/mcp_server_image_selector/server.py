@@ -105,6 +105,7 @@ class ImageSelectorGUI:
         self.original_image_path = image_path
         self.is_pdf = image_path.lower().endswith('.pdf')
         self.extracted_image_path = None
+        cleanup_tmp_dir()
 
         # Wenn PDF, extrahiere das Bild zuerst
         if self.is_pdf:
@@ -607,6 +608,19 @@ def create_tmp_dir_if_needed(base_dir: str) -> str:
     tmp_dir = os.path.join(base_dir, "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir
+
+
+def cleanup_tmp_dir():
+    """Löscht das temporäre Verzeichnis, falls es nicht leer ist"""
+    tmp_dir = create_tmp_dir_if_needed(get_working_dir())
+    if os.path.exists(tmp_dir):
+        for file in os.listdir(tmp_dir):
+            file_path = os.path.join(tmp_dir, file)
+            try:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                print(f"Fehler beim Löschen der Datei {file_path}: {e}", file=sys.stderr)
 
 
 def transform_coords(coords: tuple, scale_factor: float) -> tuple:
