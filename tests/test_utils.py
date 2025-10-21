@@ -1,13 +1,15 @@
 import os
 import shutil
-from mcp_server_image_selector.server import create_tmp_dir_if_needed, cleanup_tmp_dir  # , get_working_dir
+from mcp_server_image_selector.server import create_tmp_dir_if_needed, cleanup_tmp_dir, get_working_dir
 
 
-def test_create_tmp_dir_if_needed(tmp_path):
-    base = str(tmp_path)
-    tmp_dir = create_tmp_dir_if_needed(base)
+def test_create_tmp_dir_if_needed(tmp_path, monkeypatch):
+    # Set up temporary working directory
+    monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", str(tmp_path))
+
+    tmp_dir = create_tmp_dir_if_needed()
     assert os.path.isdir(tmp_dir)
-    assert tmp_dir.endswith(os.path.join(base, "tmp"))
+    assert tmp_dir.endswith(os.path.join(get_working_dir(), "tmp"))
 
     # Cleanup
     shutil.rmtree(tmp_dir)
@@ -20,7 +22,7 @@ def test_cleanup_tmp_dir_with_files(tmp_path, monkeypatch):
     monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", str(tmp_path))
 
     # Create tmp directory and some test files
-    tmp_dir = create_tmp_dir_if_needed(str(tmp_path))
+    tmp_dir = create_tmp_dir_if_needed()
 
     test_file1 = os.path.join(tmp_dir, "test1.png")
     test_file2 = os.path.join(tmp_dir, "test2.txt")
@@ -57,7 +59,7 @@ def test_cleanup_tmp_dir_empty_directory(tmp_path, monkeypatch):
     monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", str(tmp_path))
 
     # Create tmp directory
-    tmp_dir = create_tmp_dir_if_needed(str(tmp_path))
+    tmp_dir = create_tmp_dir_if_needed()
 
     # Verify directory is empty
     assert len(os.listdir(tmp_dir)) == 0

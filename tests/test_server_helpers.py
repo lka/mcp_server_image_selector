@@ -1,5 +1,5 @@
 import os
-from mcp_server_image_selector.server import create_tmp_dir_if_needed, ImageSelectorGUI
+from mcp_server_image_selector.server import create_tmp_dir_if_needed, ImageSelectorGUI, get_working_dir
 
 
 def test_compute_scale_small_image():
@@ -18,8 +18,8 @@ def test_compute_scale_large_image():
 def test_get_working_dir_creates(tmp_path, monkeypatch):
     # set a temporary working dir via env var
     monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", str(tmp_path))
-    p = create_tmp_dir_if_needed(str(tmp_path))
+    p = create_tmp_dir_if_needed()
     assert os.path.isdir(p)
-    assert p.endswith(os.path.join(str(tmp_path), "tmp"))
+    assert p.endswith(os.path.join(get_working_dir(), "tmp"))
     # cleanup
     os.rmdir(p)

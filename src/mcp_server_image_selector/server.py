@@ -61,11 +61,7 @@ def extract_image_from_pdf(pdf_path: str, working_dir: Optional[str] = None) -> 
         # Versuche zunächst, eingebettete Bilder zu extrahieren
         image_list = page.get_images(full=True)
 
-        if working_dir is None:
-            output_dir = create_tmp_dir_if_needed('.')
-        else:
-            output_dir = create_tmp_dir_if_needed(working_dir)
-
+        output_dir = create_tmp_dir_if_needed()
         base_name = os.path.splitext(os.path.basename(pdf_path))[0]
 
         if image_list:
@@ -603,16 +599,16 @@ def get_working_dir() -> str:
     return working_dir
 
 
-def create_tmp_dir_if_needed(base_dir: str) -> str:
+def create_tmp_dir_if_needed() -> str:
     """Erstellt ein temporäres Verzeichnis, falls nötig"""
-    tmp_dir = os.path.join(base_dir, "tmp")
+    tmp_dir = os.path.join(get_working_dir(), "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
     return tmp_dir
 
 
 def cleanup_tmp_dir():
     """Löscht das temporäre Verzeichnis, falls es nicht leer ist"""
-    tmp_dir = create_tmp_dir_if_needed(get_working_dir())
+    tmp_dir = create_tmp_dir_if_needed()
     if os.path.exists(tmp_dir):
         for file in os.listdir(tmp_dir):
             file_path = os.path.join(tmp_dir, file)
@@ -717,7 +713,7 @@ if 'app' in globals():
         """Tool-Aufrufe verarbeiten"""
 
         working_dir = get_working_dir()
-        export_dir = create_tmp_dir_if_needed(working_dir)
+        export_dir = create_tmp_dir_if_needed()
 
         if name == "get_working_directory":
             return [TextContent(type="text", text=f"Working Directory: {working_dir}")]

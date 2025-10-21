@@ -2,7 +2,6 @@ import os
 import sys
 import types
 from PIL import Image
-import shutil
 
 # ensure src/ is importable
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -91,13 +90,16 @@ def create_test_pdf_text_only(pdf_path):
         return False
 
 
-def test_extract_image_from_pdf_with_embedded_image(tmp_path):
+def test_extract_image_from_pdf_with_embedded_image(tmp_path, monkeypatch):
     """Test extraction of embedded image from PDF."""
     if not PYMUPDF_AVAILABLE:
         print("PyMuPDF not available, skipping test")
         return
 
     base_dir = str(tmp_path)
+    # Set up temporary working directory
+    monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", base_dir)
+
     pdf_path = os.path.join(base_dir, "test_with_image.pdf")
 
     # Create a test PDF with an embedded image
@@ -119,17 +121,17 @@ def test_extract_image_from_pdf_with_embedded_image(tmp_path):
     assert img.size[0] > 0 and img.size[1] > 0, "Extracted image has invalid dimensions"
     img.close()  # Close the image handle
 
-    # Cleanup
-    shutil.rmtree(base_dir)
 
-
-def test_extract_image_from_pdf_text_only(tmp_path):
+def test_extract_image_from_pdf_text_only(tmp_path, monkeypatch):
     """Test rendering of PDF page when no embedded image exists."""
     if not PYMUPDF_AVAILABLE:
         print("PyMuPDF not available, skipping test")
         return
 
     base_dir = str(tmp_path)
+    # Set up temporary working directory
+    monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", base_dir)
+
     pdf_path = os.path.join(base_dir, "test_text_only.pdf")
 
     # Create a test PDF with only text
@@ -152,17 +154,17 @@ def test_extract_image_from_pdf_text_only(tmp_path):
     assert img.size[0] > 0 and img.size[1] > 0, "Rendered image has invalid dimensions"
     img.close()  # Close the image handle
 
-    # Cleanup
-    shutil.rmtree(base_dir)
 
-
-def test_image_selector_gui_with_pdf(tmp_path):
+def test_image_selector_gui_with_pdf(tmp_path, monkeypatch):
     """Test ImageSelectorGUI initialization with a PDF file."""
     if not PYMUPDF_AVAILABLE:
         print("PyMuPDF not available, skipping test")
         return
 
     base_dir = str(tmp_path)
+    # Set up temporary working directory
+    monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", base_dir)
+
     pdf_path = os.path.join(base_dir, "test_gui.pdf")
 
     # Create a test PDF with an embedded image
@@ -188,17 +190,17 @@ def test_image_selector_gui_with_pdf(tmp_path):
     assert gui.original_image is not None, "Image was not loaded"
     assert gui.image is not None, "Resized image was not created"
 
-    # Cleanup
-    shutil.rmtree(base_dir)
 
-
-def test_export_regions_from_pdf(tmp_path):
+def test_export_regions_from_pdf(tmp_path, monkeypatch):
     """Test exporting regions from a PDF-sourced image."""
     if not PYMUPDF_AVAILABLE:
         print("PyMuPDF not available, skipping test")
         return
 
     base_dir = str(tmp_path)
+    # Set up temporary working directory
+    monkeypatch.setenv("IMAGE_SELECTOR_WORKING_DIR", base_dir)
+
     pdf_path = os.path.join(base_dir, "test_export.pdf")
 
     # Create a test PDF with an embedded image
@@ -230,9 +232,6 @@ def test_export_regions_from_pdf(tmp_path):
         else:
             assert os.path.exists(f["image_file"]), f"Text image file does not exist: {f['image_file']}"
             assert os.path.exists(f["text_file"]), f"Text file does not exist: {f['text_file']}"
-
-    # Cleanup
-    shutil.rmtree(base_dir)
 
 
 def test_pdf_with_invalid_file():
