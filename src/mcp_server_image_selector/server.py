@@ -111,6 +111,8 @@ class ImageSelectorGUI:
         if self.create_ui:
             self.root = tk.Tk()
             self.root.title("Bildausschnitt-Selector - Multi-Image")
+            # Fenster um 25% größer: 1250x1000 statt 1000x800
+            self.root.geometry("700x800")
             self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         else:
             self.root = None
@@ -149,12 +151,13 @@ class ImageSelectorGUI:
 
     @staticmethod
     def compute_scale(img_width: int, img_height: int, canvas_width: int, canvas_height: int) -> float:
-        """Berechnet den Skalierungsfaktor für ein Bild, begrenzt auf max 1.0."""
+        """Berechnet den Skalierungsfaktor für ein Bild, begrenzt auf max 1.25 (25% vergrößert)."""
         if img_width <= 0 or img_height <= 0:
             return 1.0
         scale_x = canvas_width / img_width
         scale_y = canvas_height / img_height
-        return min(scale_x, scale_y, 1.0)
+        # 25% Vergrößerung: max 1.25 statt 1.0
+        return min(scale_x, scale_y, 1.25)
 
     def _add_image(self, image_path: str):
         """Fügt ein neues Bild zur Liste hinzu"""
@@ -259,6 +262,22 @@ class ImageSelectorGUI:
         toolbar = tk.Frame(self.root, relief=tk.RAISED, borderwidth=2)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
 
+        # Hamburger-Menü Button
+        menu_btn = tk.Button(
+            toolbar,
+            text="☰",
+            command=self.show_menu,
+            font=("Arial", 16),
+            width=2,
+            relief=tk.FLAT
+        )
+        menu_btn.pack(side=tk.LEFT, padx=5)
+
+        # Separator
+        tk.Frame(toolbar, width=2, relief=tk.SUNKEN, borderwidth=1).pack(
+            side=tk.LEFT, fill=tk.Y, padx=5
+        )
+
         # Modus-Auswahl
         tk.Label(toolbar, text="Modus:").pack(side=tk.LEFT, padx=5)
         foto_radio = tk.Radiobutton(
@@ -299,64 +318,6 @@ class ImageSelectorGUI:
         )
         clear_btn.pack(side=tk.LEFT, padx=5)
 
-        # Separator
-        tk.Frame(toolbar, width=2, relief=tk.SUNKEN, borderwidth=1).pack(
-            side=tk.LEFT, fill=tk.Y, padx=10
-        )
-
-        # Rotation buttons
-        tk.Label(toolbar, text="Drehen:").pack(side=tk.LEFT, padx=5)
-        rotate_left_btn = tk.Button(
-            toolbar,
-            text="↺ 90° links",
-            command=lambda: self.rotate_image(-90),
-            bg="#FF9800",
-            fg="white",
-        )
-        rotate_left_btn.pack(side=tk.LEFT, padx=2)
-
-        rotate_right_btn = tk.Button(
-            toolbar,
-            text="↻ 90° rechts",
-            command=lambda: self.rotate_image(90),
-            bg="#FF9800",
-            fg="white",
-        )
-        rotate_right_btn.pack(side=tk.LEFT, padx=2)
-
-        rotate_180_btn = tk.Button(
-            toolbar,
-            text="↻ 180°",
-            command=lambda: self.rotate_image(180),
-            bg="#FF9800",
-            fg="white",
-        )
-        rotate_180_btn.pack(side=tk.LEFT, padx=2)
-
-        # Separator
-        tk.Frame(toolbar, width=2, relief=tk.SUNKEN, borderwidth=1).pack(
-            side=tk.LEFT, fill=tk.Y, padx=10
-        )
-
-        # Multi-Image buttons
-        tk.Label(toolbar, text="Bilder:").pack(side=tk.LEFT, padx=5)
-        add_image_btn = tk.Button(
-            toolbar,
-            text="+ Bild hinzufügen",
-            command=self.add_image,
-            bg="#9C27B0",
-            fg="white",
-        )
-        add_image_btn.pack(side=tk.LEFT, padx=2)
-
-        # Image navigation label (shows current image)
-        self.image_nav_label = tk.Label(
-            toolbar,
-            text=f"Bild 1/{len(self.images_data)}",
-            font=("Arial", 9, "bold")
-        )
-        self.image_nav_label.pack(side=tk.LEFT, padx=5)
-
         # Canvas Frame
         canvas_frame = tk.Frame(self.root)
         canvas_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -394,45 +355,42 @@ class ImageSelectorGUI:
         )
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Listen-Frame
+        # Listen-Frame (Horizontal Layout)
         list_frame = tk.Frame(self.root)
-        list_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=5, pady=5)
+        list_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5, pady=5)
 
-        # Bildliste
+        # Bildliste (links)
+        image_list_frame = tk.Frame(list_frame)
+        image_list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+
         tk.Label(
-            list_frame, text="Geladene Bilder:", font=("Arial", 10, "bold")
+            image_list_frame, text="Geladene Bilder:", font=("Arial", 10, "bold")
         ).pack()
 
-        self.image_listbox = tk.Listbox(list_frame, width=35, height=5)
-        self.image_listbox.pack(fill=tk.X)
+        self.image_listbox = tk.Listbox(image_list_frame, width=25)
+        self.image_listbox.pack(fill=tk.BOTH, expand=True)
         self.image_listbox.bind('<<ListboxSelect>>', self.on_image_select)
         self._update_image_list()
 
-        # Spacer
-        tk.Label(list_frame, text="").pack()
+        # Image navigation label (shows current image)
+        self.image_nav_label = tk.Label(
+            image_list_frame,
+            text=f"Bild 1/{len(self.images_data)}",
+            font=("Arial", 9, "bold"),
+            fg="#555"
+        )
+        self.image_nav_label.pack(pady=5)
+
+        # Regions-Liste (rechts)
+        region_list_frame = tk.Frame(list_frame)
+        region_list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
         tk.Label(
-            list_frame, text="Gespeicherte Bereiche:", font=("Arial", 10, "bold")
+            region_list_frame, text="Gespeicherte Bereiche:", font=("Arial", 10, "bold")
         ).pack()
 
-        self.region_listbox = tk.Listbox(list_frame, width=35, height=10)
+        self.region_listbox = tk.Listbox(region_list_frame, width=25)
         self.region_listbox.pack(fill=tk.BOTH, expand=True)
-
-        # Anleitung
-        help_frame = tk.Frame(list_frame, relief=tk.GROOVE, borderwidth=2)
-        help_frame.pack(fill=tk.X, pady=10)
-
-        help_text = """
-Anleitung:
-1. Wählen Sie Modus (Foto/Text)
-2. Ziehen Sie einen Bereich auf
-3. Klicken Sie 'Auswahl speichern'
-4. Wiederholen Sie für weitere Bereiche
-5. Klicken Sie 'Fertig' zum Exportieren
-        """
-        tk.Label(help_frame, text=help_text, justify=tk.LEFT, font=("Arial", 8)).pack(
-            padx=5, pady=5
-        )
 
     def _load_current_image(self):  # pragma: no cover
         """Lädt das aktuell ausgewählte Bild"""
@@ -447,8 +405,8 @@ Anleitung:
                 self._display_image()
             else:
                 # use default canvas fallback sizes as in _display_image
-                canvas_width = 1280
-                canvas_height = 1024
+                canvas_width = 1600  # 25% größer als 1280
+                canvas_height = 1280  # 25% größer als 1024
                 img_width, img_height = self.original_image.size
                 self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
                 # Precompute a resized image for downstream processing if desired
@@ -472,9 +430,9 @@ Anleitung:
             canvas_height = self.canvas.winfo_height()
 
             if canvas_width <= 1:
-                canvas_width = 1280
+                canvas_width = 1600  # 25% größer als 1280
             if canvas_height <= 1:
-                canvas_height = 1024
+                canvas_height = 1280  # 25% größer als 1024
 
             img_width, img_height = self.original_image.size
             self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
@@ -576,6 +534,216 @@ Anleitung:
             # Statusmeldung
             img_name = os.path.basename(self.original_image_path)
             self.status_bar.config(text=f"Gewechselt zu: {img_name}")
+
+    def show_menu(self):  # pragma: no cover
+        """Zeigt das Hamburger-Menü an"""
+        menu = tk.Menu(self.root, tearoff=0)
+
+        # Multi-Image Menü
+        menu.add_command(label="🖼️ Bilder verwalten", state="disabled")
+        menu.add_command(label="  ➕ Bild hinzufügen", command=self.add_image)
+
+        menu.add_separator()
+
+        # Rotation-Menü
+        menu.add_command(label="🔄 Bild drehen", state="disabled")
+        menu.add_command(label="  ↺ 90° links", command=lambda: self.rotate_image(-90))
+        menu.add_command(label="  ↻ 90° rechts", command=lambda: self.rotate_image(90))
+        menu.add_command(label="  ↻ 180°", command=lambda: self.rotate_image(180))
+
+        menu.add_separator()
+        menu.add_command(label="📖 Hilfe", command=self.show_help)
+        menu.add_separator()
+        menu.add_command(label="ℹ️ Über", command=self.show_about)
+        menu.add_separator()
+        menu.add_command(label="🚪 Beenden", command=self.on_closing)
+
+        # Menü an der Mausposition anzeigen
+        try:
+            menu.tk_popup(self.root.winfo_pointerx(), self.root.winfo_pointery())
+        finally:
+            menu.grab_release()
+
+    def show_help(self):  # pragma: no cover
+        """Zeigt das modale Hilfefenster an"""
+        help_window = tk.Toplevel(self.root)
+        help_window.title("Hilfe - Bildausschnitt-Selector")
+        help_window.geometry("500x450")
+        help_window.resizable(False, False)
+
+        # Fenster modal machen
+        help_window.transient(self.root)
+        help_window.grab_set()
+
+        # Zentriere das Fenster
+        help_window.update_idletasks()
+        x = (help_window.winfo_screenwidth() // 2) - (500 // 2)
+        y = (help_window.winfo_screenheight() // 2) - (450 // 2)
+        help_window.geometry(f"500x450+{x}+{y}")
+
+        # Titel
+        title_label = tk.Label(
+            help_window,
+            text="🖼️ Bildausschnitt-Selector",
+            font=("Arial", 16, "bold"),
+            pady=10
+        )
+        title_label.pack()
+
+        # Scrollbarer Text-Bereich
+        text_frame = tk.Frame(help_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        help_text = tk.Text(
+            text_frame,
+            wrap=tk.WORD,
+            yscrollcommand=scrollbar.set,
+            font=("Arial", 10),
+            padx=10,
+            pady=10
+        )
+        help_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=help_text.yview)
+
+        # Hilfetext
+        help_content = """
+📌 GRUNDFUNKTIONEN
+
+1️⃣ Bild öffnen
+   • Der Server startet mit einem initial angegebenen Bild oder PDF
+   • PDF-Dateien werden automatisch verarbeitet
+
+2️⃣ Weitere Bilder hinzufügen
+   • Button "+ Bild hinzufügen" in der Toolbar
+   • Zwischen Bildern wechseln durch Klick in der Bildliste
+
+3️⃣ Regionen auswählen
+   • Modus wählen: "Foto" oder "Text"
+   • Mit der Maus einen Bereich aufziehen
+   • "Auswahl speichern" klicken
+
+4️⃣ Bild rotieren
+   • Buttons zum Drehen um 90° links, 90° rechts oder 180°
+   • Bereiche werden beim Rotieren zurückgesetzt
+
+5️⃣ Export
+   • "Fertig & Exportieren" exportiert alle Regionen von allen Bildern
+   • Dateien werden im tmp-Verzeichnis gespeichert
+
+
+🎯 MODI
+
+• FOTO: Für Bildausschnitte (blaue Markierung)
+  → Export als PNG-Datei
+
+• TEXT: Für Textbereiche (grüne Markierung)
+  → Export als PNG + TXT-Datei (Template)
+
+
+📁 DATEINAMEN
+
+Format: bildname_timestamp_regionXX_modus.png
+
+Beispiel:
+  dokument1_20250122_143022_region01_foto.png
+  dokument2_20250122_143022_region02_text.png
+
+
+💡 TIPPS
+
+• Die Bildliste zeigt: ▶ dateiname.jpg [3 Bereiche]
+• Jedes Bild kann unabhängig bearbeitet werden
+• Bei PDF: Erstes Bild wird extrahiert oder Seite gerendert
+• Alle Exporte landen im gleichen tmp-Verzeichnis
+
+
+⌨️ WORKFLOW-BEISPIEL
+
+1. Erste Datei wird geladen
+2. Bereiche markieren und speichern
+3. "+ Bild hinzufügen" für weitere Dateien
+4. In Bildliste zwischen Dokumenten wechseln
+5. Bereiche in allen Bildern markieren
+6. "Fertig & Exportieren" → Alle werden exportiert
+        """
+
+        help_text.insert("1.0", help_content)
+        help_text.config(state=tk.DISABLED)  # Readonly
+
+        # Schließen-Button
+        close_btn = tk.Button(
+            help_window,
+            text="Schließen",
+            command=help_window.destroy,
+            bg="#2196F3",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15
+        )
+        close_btn.pack(pady=10)
+
+        # Focus auf Fenster
+        help_window.focus_set()
+
+    def show_about(self):  # pragma: no cover
+        """Zeigt das Über-Fenster an"""
+        about_window = tk.Toplevel(self.root)
+        about_window.title("Über")
+        about_window.geometry("400x250")
+        about_window.resizable(False, False)
+
+        # Fenster modal machen
+        about_window.transient(self.root)
+        about_window.grab_set()
+
+        # Zentriere das Fenster
+        about_window.update_idletasks()
+        x = (about_window.winfo_screenwidth() // 2) - (400 // 2)
+        y = (about_window.winfo_screenheight() // 2) - (250 // 2)
+        about_window.geometry(f"400x250+{x}+{y}")
+
+        # Icon/Titel
+        title_label = tk.Label(
+            about_window,
+            text="🖼️",
+            font=("Arial", 48)
+        )
+        title_label.pack(pady=10)
+
+        # Info-Text
+        info_text = """
+MCP Server Image Selector
+Version 1.0.0
+
+Ein MCP-kompatibler Server für interaktive
+Bildausschnitt-Selektion mit Multi-Bild-Support.
+
+© 2025
+MIT License
+        """
+
+        info_label = tk.Label(
+            about_window,
+            text=info_text,
+            font=("Arial", 10),
+            justify=tk.CENTER
+        )
+        info_label.pack(pady=10)
+
+        # Schließen-Button
+        close_btn = tk.Button(
+            about_window,
+            text="OK",
+            command=about_window.destroy,
+            bg="#2196F3",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=10
+        )
+        close_btn.pack(pady=10)
 
     def on_mouse_down(self, event):  # pragma: no cover
         """Maus-Klick Event"""
@@ -724,8 +892,8 @@ Anleitung:
         else:
             # Update scale factor and resized image for non-GUI mode
             img_width, img_height = self.original_image.size
-            canvas_width = 1280
-            canvas_height = 1024
+            canvas_width = 1600  # 25% größer als 1280
+            canvas_height = 1280  # 25% größer als 1024
             self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
             new_width = int(img_width * self.scale_factor)
             new_height = int(img_height * self.scale_factor)
@@ -1056,5 +1224,114 @@ def run():
     asyncio.run(main())
 
 
+def run_standalone(image_path: str = None):
+    """Startet die GUI im Standalone-Modus ohne MCP-Server
+
+    Args:
+        image_path: Optional - Pfad zum initialen Bild. Wenn None, wird ein Dateiauswahl-Dialog geöffnet.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
+
+    # Working directory ermitteln
+    working_dir = get_working_dir()
+    export_dir = create_tmp_dir_if_needed()
+
+    # Wenn kein Bildpfad angegeben, Dateiauswahl-Dialog öffnen
+    if image_path is None:
+        root = tk.Tk()
+        root.withdraw()  # Hauptfenster verstecken
+
+        eingang_dir = os.path.join(working_dir, "Eingang")
+        if not os.path.exists(eingang_dir):
+            eingang_dir = working_dir
+
+        file_types = [
+            ("Alle unterstützten Formate", "*.png *.jpg *.jpeg *.bmp *.gif *.pdf"),
+            ("Bilddateien", "*.png *.jpg *.jpeg *.bmp *.gif"),
+            ("PDF-Dateien", "*.pdf"),
+            ("Alle Dateien", "*.*")
+        ]
+
+        image_path = filedialog.askopenfilename(
+            title="Bild auswählen",
+            filetypes=file_types,
+            initialdir=eingang_dir
+        )
+
+        root.destroy()
+
+        if not image_path:
+            print("Keine Datei ausgewählt. Abbruch.")
+            return
+
+    # Relativen Pfad auflösen
+    if not os.path.isabs(image_path):
+        image_path = os.path.join(working_dir, image_path)
+
+    if not os.path.exists(image_path):
+        print(f"Fehler: Bild nicht gefunden: {image_path}")
+        return
+
+    try:
+        # GUI starten
+        gui = ImageSelectorGUI(image_path, export_dir)
+        images_data = gui.run()
+
+        if images_data:
+            # Exportiere alle Regionen von allen Bildern
+            all_exported_files = []
+            total_exported = 0
+
+            for img_data in images_data:
+                if img_data['regions']:
+                    # Koordinaten umrechnen
+                    for region in img_data['regions']:
+                        region["coords"] = transform_coords(
+                            region["coords"],
+                            img_data['scale_factor']
+                        )
+
+                    # Export für dieses Bild
+                    result = export_regions(
+                        img_data['original_path'],
+                        img_data['regions'],
+                        export_dir,
+                        image_object=img_data['original_image']
+                    )
+
+                    all_exported_files.extend(result["files"])
+                    total_exported += result["exported_count"]
+
+            if total_exported > 0:
+                print(f"\n✓ Erfolgreich {total_exported} Bereiche von {len(images_data)} Bild(ern) exportiert:\n")
+                for file_info in all_exported_files:
+                    if file_info["type"] == "foto":
+                        print(f"  Region {file_info['region']} (FOTO): {os.path.basename(file_info['file'])}")
+                    else:
+                        print(f"  Region {file_info['region']} (TEXT):")
+                        print(f"    - Bild: {os.path.basename(file_info['image_file'])}")
+                        print(f"    - Text: {os.path.basename(file_info['text_file'])}")
+
+                print(f"\nAusgabeverzeichnis: {export_dir}")
+            else:
+                print("Keine Bereiche zum Exportieren ausgewählt")
+        else:
+            print("Auswahl abgebrochen - keine Bereiche exportiert")
+
+    except Exception as e:
+        print(f"Fehler: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
 if __name__ == "__main__":
-    run()
+    # MCP-Modus (Default): python server.py
+    # Standalone-Modus: python server.py --standalone [bildpfad]
+    if len(sys.argv) > 1 and sys.argv[1] == "--standalone":
+        # Standalone-Modus
+        image_path = sys.argv[2] if len(sys.argv) > 2 else None
+        run_standalone(image_path)
+    else:
+        # MCP-Modus (default)
+        run()

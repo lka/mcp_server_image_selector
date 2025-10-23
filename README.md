@@ -22,13 +22,29 @@ Der MCP Server Image Selector ermöglicht es, **mehrere Bilder in einer Session*
 - Abhängigkeiten aus `pyproject.toml` installieren (z.B. mit `pip install -e .`)
 
 ## Starten des Servers
+
+### MCP-Server-Modus (Default)
 1. Virtuelle Umgebung aktivieren:
    - Windows: `venv\Scripts\activate`
    - Linux/Mac: `source venv/bin/activate`
+
 2. Server starten:
-   ```
+   ```bash
+   # MCP-Server-Modus (default)
    python src/mcp_server_image_selector/server.py
    ```
+
+### Standalone-Modus (nur GUI, ohne MCP)
+```bash
+# Ohne Bildpfad - öffnet Dateiauswahl-Dialog
+python src/mcp_server_image_selector/server.py --standalone
+
+# Mit Bildpfad
+python src/mcp_server_image_selector/server.py --standalone pfad/zum/bild.jpg
+
+# Alternative: Beispiel-Script verwenden
+python example_standalone.py
+```
 
 ## Benutzung
 
