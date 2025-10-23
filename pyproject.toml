@@ -27,6 +27,9 @@ dev = [
     "isort",
     "mypy",
 ]
+ocr = [
+    "pytesseract>=0.3.10",
+]
 
 [project.scripts]
 mcp-server-image-selector = "mcp_server_image_selector.server:main"

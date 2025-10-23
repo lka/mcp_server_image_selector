@@ -20,6 +20,13 @@ try:
 except ImportError:
     fitz = None
 
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    pytesseract = None
+    TESSERACT_AVAILABLE = False
+
 # MCP imports
 try:
     from mcp.server import Server
@@ -1078,11 +1085,28 @@ def export_regions(image_path: str, regions: list, working_dir: str, image_objec
                 exported_files.append(info)
             else:
                 crop.save(info["image_file"], "PNG")
+
+                # OCR mit Tesseract durchführen, falls verfügbar
+                ocr_text = ""
+                if TESSERACT_AVAILABLE and pytesseract:
+                    try:
+                        # Tesseract auf dem Crop-Bild ausführen
+                        # Sprache: Deutsch + Englisch
+                        ocr_text = pytesseract.image_to_string(crop, lang='deu+eng')
+                        if ocr_text.strip():
+                            ocr_text = ocr_text.strip()
+                        else:
+                            ocr_text = "[Kein Text erkannt]"
+                    except Exception as e:
+                        ocr_text = f"[OCR-Fehler: {str(e)}]"
+                else:
+                    ocr_text = "[Tesseract nicht verfügbar - bitte installieren: pip install pytesseract]"
+
                 with open(info["text_file"], "w", encoding="utf-8") as f:
                     f.write(f"Textbereich {i}\n")
                     f.write(f"Bildquelle: {info['image_file']}\n")
                     f.write(f"Original: {image_path}\n")
-                    f.write("\n[OCR-Text hier einfügen]\n")
+                    f.write(f"\n{ocr_text}\n")
                 exported_files.append(info)
 
         except Exception as e:

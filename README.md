@@ -12,6 +12,7 @@ Der MCP Server Image Selector ermöglicht es, **mehrere Bilder in einer Session*
 - Unterstützung für verschiedene Bildformate (JPEG, PNG, BMP, GIF)
 - **PDF-Unterstützung**: Automatische Extraktion von eingebetteten Bildern oder Rendering der ersten Seite
 - **Bild-Rotation**: Bilder können um 90°, -90° oder 180° gedreht werden
+- **OCR-Integration**: Automatische Texterkennung mit Tesseract für Text-Bereiche (optional)
 - Export der ausgewählten Regionen als Bild- und/oder Textdateien
 - Automatische Benennung und Ablage der Exportdateien im tmp-Verzeichnis
 - Integration in MCP-Workflows
@@ -20,6 +21,40 @@ Der MCP Server Image Selector ermöglicht es, **mehrere Bilder in einer Session*
 - Python 3.8+
 - Virtuelle Umgebung empfohlen (`python -m venv venv`)
 - Abhängigkeiten aus `pyproject.toml` installieren (z.B. mit `pip install -e .`)
+
+### Optionale OCR-Unterstützung
+Für automatische Texterkennung in Text-Bereichen ist Tesseract OCR optional verfügbar. Die Software funktioniert auch ohne OCR - in diesem Fall wird ein Hinweis in den Text-Dateien ausgegeben.
+
+#### Installation (optional)
+
+1. **Tesseract OCR installieren**:
+   - **Windows**: [Tesseract Installer](https://github.com/UB-Mannheim/tesseract/wiki) herunterladen und installieren
+     - Bei Installation unbedingt die deutschen Sprachpakete mit auswählen!
+   - **Linux**: `sudo apt-get install tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng`
+   - **macOS**: `brew install tesseract tesseract-lang`
+
+2. **Python-Package installieren**:
+   ```bash
+   # Mit optional dependencies aus pyproject.toml:
+   pip install -e ".[ocr]"
+
+   # Oder direkt:
+   pip install pytesseract
+   ```
+
+3. **Sprachpakete prüfen**:
+   Die OCR-Funktion nutzt standardmäßig Deutsch + Englisch (`deu+eng`). Ohne diese Sprachpakete funktioniert die OCR nicht korrekt.
+
+   Verfügbare Sprachen prüfen:
+   ```bash
+   tesseract --list-langs
+   ```
+
+#### OCR-Funktionalität
+- Wird **automatisch** bei Text-Bereichen (Modus "Text") angewendet
+- Erkennt deutschen und englischen Text
+- Schreibt erkannten Text in die `.txt`-Dateien
+- Ohne Tesseract: Platzhalter-Text mit Installationshinweis wird eingefügt
 
 ## Starten des Servers
 
