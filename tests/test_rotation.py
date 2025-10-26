@@ -23,7 +23,7 @@ if "mcp" not in sys.modules:
     sys.modules["mcp.server.stdio"] = _m_server_stdio
     sys.modules["mcp.types"] = _m_types
 
-from mcp_server_image_selector.server import ImageSelectorGUI
+from mcp_server_image_selector.gui import ImageSelectorGUI
 
 TEST_IMAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Scan20250919130047_1.jpeg"))
 
@@ -145,7 +145,7 @@ def test_rotate_image_with_no_image(tmp_path):
 
 def test_export_with_rotated_image(tmp_path):
     """Test that export uses the rotated image, not the original"""
-    from mcp_server_image_selector.server import export_regions
+    from mcp_server_image_selector.export import export_regions
     from PIL import Image
 
     gui = ImageSelectorGUI(TEST_IMAGE, str(tmp_path), create_ui=False)

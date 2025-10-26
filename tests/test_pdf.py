@@ -23,7 +23,9 @@ if "mcp" not in sys.modules:
     sys.modules["mcp.server.stdio"] = _m_server_stdio
     sys.modules["mcp.types"] = _m_types
 
-from mcp_server_image_selector.server import extract_image_from_pdf, ImageSelectorGUI, export_regions
+from mcp_server_image_selector.pdf_utils import extract_image_from_pdf
+from mcp_server_image_selector.gui import ImageSelectorGUI
+from mcp_server_image_selector.export import export_regions
 
 try:
     import fitz  # PyMuPDF
@@ -109,7 +111,7 @@ def test_extract_image_from_pdf_with_embedded_image(tmp_path, monkeypatch):
         return
 
     # Extract the image
-    extracted_path = extract_image_from_pdf(pdf_path, base_dir)
+    extracted_path = extract_image_from_pdf(pdf_path)
 
     # Verify the extraction
     assert extracted_path is not None, "Failed to extract image from PDF"
@@ -141,7 +143,7 @@ def test_extract_image_from_pdf_text_only(tmp_path, monkeypatch):
         return
 
     # Extract/render the page
-    extracted_path = extract_image_from_pdf(pdf_path, base_dir)
+    extracted_path = extract_image_from_pdf(pdf_path)
 
     # Verify the rendering
     assert extracted_path is not None, "Failed to render PDF page"

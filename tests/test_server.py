@@ -23,7 +23,7 @@ if "mcp" not in sys.modules:
     sys.modules["mcp.server.stdio"] = _m_server_stdio
     sys.modules["mcp.types"] = _m_types
 
-from mcp_server_image_selector.server import ImageSelectorGUI
+from mcp_server_image_selector.gui import ImageSelectorGUI
 
 TEST_IMAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Scan20250919130047_1.jpeg"))
 

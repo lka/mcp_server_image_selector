@@ -24,7 +24,7 @@ if "mcp" not in sys.modules:
     sys.modules["mcp.server.stdio"] = _m_server_stdio
     sys.modules["mcp.types"] = _m_types
 
-from mcp_server_image_selector.server import export_regions
+from mcp_server_image_selector.export import export_regions
 
 
 def make_test_image(path, size=(200, 100), color=(255, 0, 0)):

@@ -142,23 +142,63 @@ Listet alle exportierten Bildausschnitte aus dem tmp-Verzeichnis auf.
 ### `get_working_directory`
 Zeigt das aktuelle Working Directory an.
 
+## Projektstruktur
+
+Das Projekt ist modular aufgebaut für bessere Wartbarkeit:
+
+```
+src/mcp_server_image_selector/
+├── server.py          # MCP-Server und Tool-Definitionen
+├── gui.py             # GUI-Komponente (ImageSelectorGUI)
+├── utils.py           # Utility-Funktionen (Verzeichnisse, Koordinaten)
+├── pdf_utils.py       # PDF-Verarbeitung und Bildextraktion
+└── export.py          # Export-Funktionen inkl. OCR
+
+tests/
+├── test_export.py         # Export-Funktionalität
+├── test_export_errors.py  # Export-Fehlerbehandlung
+├── test_gui.py            # GUI-spezifische Tests
+├── test_pdf.py            # PDF-Verarbeitung
+├── test_rotation.py       # Bild-Rotation
+├── test_server.py         # Server/GUI-Initialisierung
+└── test_utils.py          # Utility-Funktionen
+```
+
 ## Konfiguration
+
+### MCP-Integration
 Die Datei `claude_desktop_config.json` enthält die Konfiguration für die Integration in MCP-Umgebungen.
 
 ### Umgebungsvariablen
 - `IMAGE_SELECTOR_WORKING_DIR`: Optionales Working Directory (Standard: aktuelles Verzeichnis)
 
-## Tests / CI
-- Tests werden mit `pytest` ausgeführt.
-- Ein GitHub Actions Workflow (`.github/workflows/ci.yml`) führt Tests bei Push/PR auf `main` aus.
+## Entwicklung
 
-Um lokal zu testen:
-```powershell
-venv\Scripts\activate
-pip install -r requirements.txt  # optional
-pip install pytest pillow
-pytest -q
+### Tests ausführen
+
+Alle Tests mit pytest:
+```bash
+# Aktiviere virtuelle Umgebung
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# Installiere Dev-Dependencies
+pip install -e ".[dev]"
+
+# Führe Tests aus
+pytest -q              # Kurze Ausgabe
+pytest -v              # Verbose
+pytest -xvs            # Stop bei erstem Fehler, verbose
 ```
+
+### Test-Organisation
+- **28 Tests** decken alle Hauptfunktionen ab
+- Tests sind nach Modulen organisiert
+- Verwendet pytest mit fixtures für Isolation
+- Monkeypatch für Umgebungsvariablen
+
+### CI/CD
+Ein GitHub Actions Workflow (`.github/workflows/ci.yml`) führt Tests automatisch bei Push/PR auf `main` aus.
 
 ## Lizenz
 MIT License

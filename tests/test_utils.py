@@ -1,7 +1,14 @@
+"""
+Tests für Utility-Funktionen (utils.py und export.py)
+"""
+
 import os
 import shutil
-from mcp_server_image_selector.server import create_tmp_dir_if_needed, cleanup_tmp_dir, get_working_dir
+from mcp_server_image_selector.utils import create_tmp_dir_if_needed, cleanup_tmp_dir, get_working_dir, transform_coords
+from mcp_server_image_selector.export import format_export_paths
 
+
+# Tests für Verzeichnis-Funktionen
 
 def test_create_tmp_dir_if_needed(tmp_path, monkeypatch):
     # Set up temporary working directory
@@ -88,3 +95,39 @@ def test_cleanup_tmp_dir_nonexistent(tmp_path, monkeypatch):
     # Verify directory now exists and is empty
     assert os.path.exists(tmp_dir)
     assert len(os.listdir(tmp_dir)) == 0
+
+
+# Tests für Koordinaten-Transformation
+
+def test_transform_coords_normal():
+    coords = (100, 100, 200, 200)
+    scaled = transform_coords(coords, 2.0)
+    assert scaled == (50, 50, 100, 100)
+
+
+def test_transform_coords_zero_scale():
+    coords = (10, 10, 20, 20)
+    try:
+        transform_coords(coords, 0)
+        assert False, "Expected ValueError for zero scale"
+    except ValueError:
+        pass
+
+
+# Tests für Export-Pfade
+
+def test_format_export_paths_foto(tmp_path):
+    base = "img"
+    ts = "20250101_000000"
+    info = format_export_paths(base, ts, 1, "foto", str(tmp_path))
+    assert info["type"] == "foto"
+    assert info["file"].endswith("_region01_foto.png")
+
+
+def test_format_export_paths_text(tmp_path):
+    base = "img"
+    ts = "20250101_000000"
+    info = format_export_paths(base, ts, 2, "text", str(tmp_path))
+    assert info["type"] == "text"
+    assert info["image_file"].endswith("_region02_text.png")
+    assert info["text_file"].endswith("_region02_text.txt")
