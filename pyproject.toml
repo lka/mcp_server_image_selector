@@ -32,7 +32,7 @@ ocr = [
 ]
 
 [project.scripts]
-mcp-server-image-selector = "mcp_server_image_selector.server:main"
+mcp-server-image-selector = "mcp_server_image_selector.server:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]

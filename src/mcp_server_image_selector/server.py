@@ -194,6 +194,12 @@ if 'app' in globals():
 
 async def main():
     """Hauptfunktion"""
+    if 'app' not in globals():
+        print("Fehler: MCP Server konnte nicht initialisiert werden.", file=sys.stderr)
+        print("Bitte stellen Sie sicher, dass das 'mcp' Paket installiert ist:", file=sys.stderr)
+        print("  pip install mcp", file=sys.stderr)
+        sys.exit(1)
+
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
