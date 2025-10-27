@@ -69,6 +69,12 @@ Für automatische Texterkennung in Text-Bereichen ist Tesseract OCR optional ver
    python src/mcp_server_image_selector/server.py
    ```
 
+3. Server starten (mit venv automatisch):
+   ```bash
+   # MCP-Server-Modus (default)
+   `....mcp_server_image_selector\venv\Scripts\mcp-server-image-selector.exe`
+   ```
+
 ### Standalone-Modus (nur GUI, ohne MCP)
 ```bash
 # Ohne Bildpfad - öffnet Dateiauswahl-Dialog
