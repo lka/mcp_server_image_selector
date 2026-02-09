@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Beispiel-Script zum Starten der GUI im Standalone-Modus
+Beispiel-Script zum Starten der GUI im Standalone-Modus.
 
 Verwendung:
     python example_standalone.py                    # Öffnet Dateiauswahl-Dialog
@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from mcp_server_image_selector.server import run_standalone
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Optional: Setze Working Directory
     # os.environ['IMAGE_SELECTOR_WORKING_DIR'] = '/pfad/zum/working/dir'
 

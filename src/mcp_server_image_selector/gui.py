@@ -1,5 +1,8 @@
-"""
-GUI-Komponente für die Bildausschnitt-Selektion
+"""GUI-Komponente für die Bildausschnitt-Selektion.
+
+Stellt eine tkinter-basierte GUI bereit, mit der Benutzer interaktiv
+Bildausschnitte (Foto- oder Textbereiche) aus einem oder mehreren
+Bildern bzw. PDF-Dateien auswählen und exportieren können.
 """
 
 import tkinter as tk
@@ -9,27 +12,57 @@ import os
 
 
 class ImageSelectorGUI:
-    """GUI-Komponente für die Bildauswahl"""
+    """GUI-Komponente für die interaktive Bildauswahl und Region-Selektion.
 
-    def __init__(self, image_path: str, working_dir: str, create_ui: bool = True):
-        from .utils import cleanup_tmp_dir
+    Unterstützt mehrere Bilder gleichzeitig (Multi-Image), PDF-Extraktion,
+    Bilddrehung sowie den Export markierter Bereiche als Foto- oder
+    Text-Regionen.
 
-        self.working_dir = working_dir
+    Attributes:
+        IMAGE_EXTENSIONS: Tuple der unterstützten Bilddatei-Endungen.
+        working_dir: Arbeitsverzeichnis für den Export.
+        create_ui: Ob die tkinter-GUI erstellt wird (False für Tests).
+        images_data: Liste aller geladenen Bilder mit Metadaten und Regionen.
+        current_image_index: Index des aktuell angezeigten Bildes.
+        result_ready: True wenn der Benutzer den Export bestätigt hat.
+    """
+
+    # Unterstützte Bilddatei-Endungen
+    IMAGE_EXTENSIONS = ('.pdf', '.jpeg', '.jpg', '.png', '.bmp', '.gif')
+
+    def __init__(
+        self, image_path: str = None, working_dir: str = None, create_ui: bool = True
+    ):
+        """Initialisiert die GUI und lädt Bilder.
+
+        Args:
+            image_path: Pfad zum initialen Bild oder PDF. Wenn None, werden
+                die ersten 4 Bilddateien aus dem Arbeitsverzeichnis geladen.
+            working_dir: Verzeichnis für den Export. Wenn None, wird
+                get_working_dir() verwendet.
+            create_ui: Wenn True, wird die tkinter-GUI erstellt. Bei False
+                werden nur die Bilddaten geladen (für Tests).
+        """
+        from .utils import cleanup_tmp_dir, get_working_dir
+
+        self.working_dir = working_dir or get_working_dir()
         self.create_ui = create_ui
         self.result_ready = False
         cleanup_tmp_dir()
 
         # Multi-image support: Liste aller geladenen Bilder
-        self.images_data = []  # Liste von Dicts: {original_path, image_path, is_pdf, extracted_path, original_image, scale_factor, regions}
+        self.images_data = (
+            []
+        )  # Liste von Dicts: {original_path, image_path, is_pdf, extracted_path, original_image, scale_factor, regions}
         self.current_image_index = 0
 
         # GUI root and widgets are only created when create_ui is True.
         if self.create_ui:
             self.root = tk.Tk()
-            self.root.title("Bildausschnitt-Selector - Multi-Image")
+            self.root.title('Bildausschnitt-Selector - Multi-Image')
             # Fenster um 25% größer: 1250x1000 statt 1000x800
-            self.root.geometry("700x800")
-            self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+            self.root.geometry('700x800')
+            self.root.protocol('WM_DELETE_WINDOW', self.on_closing)
         else:
             self.root = None
 
@@ -44,30 +77,49 @@ class ImageSelectorGUI:
         self.current_rect = None
         # Only create tkinter variables when GUI is enabled
         if self.create_ui:
-            self.selection_mode = tk.StringVar(value="foto")
+            self.selection_mode = tk.StringVar(value='foto')
         else:
             # lightweight dummy with get() method used by the code
             class _DummyVar:
-                def __init__(self, v="foto"):
+                def __init__(self, v='foto'):
                     self._v = v
 
                 def get(self):
                     return self._v
 
-            self.selection_mode = _DummyVar("foto")
+            self.selection_mode = _DummyVar('foto')
         self.current_selection = None
 
-        # Erstes Bild laden
-        self._add_image(image_path)
+        # Bilder laden: expliziter Pfad oder automatisch aus Arbeitsverzeichnis
+        if image_path:
+            self._add_image(image_path)
+        else:
+            self._auto_load_images()
 
         if self.create_ui:
             self._setup_ui()
         # Always load the image data; display is conditional
-        self._load_current_image()
+        if self.images_data:
+            self._load_current_image()
 
     @staticmethod
-    def compute_scale(img_width: int, img_height: int, canvas_width: int, canvas_height: int) -> float:
-        """Berechnet den Skalierungsfaktor für ein Bild, begrenzt auf max 1.25 (25% vergrößert)."""
+    def compute_scale(
+        img_width: int, img_height: int, canvas_width: int, canvas_height: int
+    ) -> float:
+        """Berechnet den Skalierungsfaktor, um ein Bild in den Canvas einzupassen.
+
+        Der Faktor wird auf maximal 1.25 begrenzt, damit kleine Bilder
+        nicht zu stark vergrößert werden.
+
+        Args:
+            img_width: Breite des Originalbildes in Pixeln.
+            img_height: Höhe des Originalbildes in Pixeln.
+            canvas_width: Verfügbare Breite des Canvas in Pixeln.
+            canvas_height: Verfügbare Höhe des Canvas in Pixeln.
+
+        Returns:
+            Skalierungsfaktor als float (max. 1.25).
+        """
         if img_width <= 0 or img_height <= 0:
             return 1.0
         scale_x = canvas_width / img_width
@@ -75,8 +127,47 @@ class ImageSelectorGUI:
         # 25% Vergrößerung: max 1.25 statt 1.0
         return min(scale_x, scale_y, 1.25)
 
+    def _auto_load_images(self):
+        """Lädt automatisch die ersten 4 Bilddateien aus dem Bildverzeichnis.
+
+        Durchsucht das von get_image_subdirectory() zurückgegebene Verzeichnis
+        alphabetisch nach Dateien mit Endungen aus IMAGE_EXTENSIONS und
+        lädt maximal 4 davon. Fehlerhafte Dateien werden übersprungen.
+        """
+        from .utils import get_image_subdirectory
+
+        scan_dir = get_image_subdirectory()
+        try:
+            files = sorted(os.listdir(scan_dir))
+        except OSError:
+            return
+
+        loaded = 0
+        for filename in files:
+            if loaded >= 4:
+                break
+            if filename.lower().endswith(self.IMAGE_EXTENSIONS):
+                full_path = os.path.join(scan_dir, filename)
+                if os.path.isfile(full_path):
+                    try:
+                        self._add_image(full_path)
+                        loaded += 1
+                    except Exception:
+                        pass
+
     def _add_image(self, image_path: str):
-        """Fügt ein neues Bild zur Liste hinzu"""
+        """Fügt ein neues Bild oder PDF zur internen Bildliste hinzu.
+
+        Bei PDF-Dateien wird das erste eingebettete Bild extrahiert oder
+        die erste Seite gerendert. Das Ergebnis wird als Dict in
+        self.images_data gespeichert.
+
+        Args:
+            image_path: Absoluter oder relativer Pfad zum Bild oder PDF.
+
+        Raises:
+            ValueError: Wenn aus einem PDF kein Bild extrahiert werden konnte.
+        """
         from pathlib import Path
         from .pdf_utils import extract_image_from_pdf
 
@@ -88,9 +179,11 @@ class ImageSelectorGUI:
             if Path(image_path).is_absolute():
                 extracted_path = extract_image_from_pdf(image_path)
             else:
-                extracted_path = extract_image_from_pdf(os.path.join(self.working_dir, image_path))
+                extracted_path = extract_image_from_pdf(
+                    os.path.join(self.working_dir, image_path)
+                )
             if extracted_path is None:
-                raise ValueError(f"Konnte kein Bild aus PDF extrahieren: {image_path}")
+                raise ValueError(f'Konnte kein Bild aus PDF extrahieren: {image_path}')
             actual_image_path = extracted_path
         else:
             actual_image_path = image_path
@@ -103,80 +196,84 @@ class ImageSelectorGUI:
             'extracted_path': extracted_path,
             'original_image': None,  # Wird bei _load_current_image geladen
             'scale_factor': 1.0,
-            'regions': []
+            'regions': [],
         }
         self.images_data.append(image_data)
 
     # Properties für Rückwärtskompatibilität (greifen auf aktuelles Bild zu)
     @property
     def original_image_path(self):
-        """Gibt den original Pfad des aktuellen Bildes zurück"""
+        """Gibt den originalen Dateipfad des aktuell ausgewählten Bildes zurück."""
         if self.images_data:
             return self.images_data[self.current_image_index]['original_path']
         return None
 
     @property
     def image_path(self):
-        """Gibt den Pfad des aktuellen Bildes zurück (kann extrahiert sein bei PDF)"""
+        """Gibt den tatsächlichen Bildpfad zurück (bei PDFs der extrahierte Pfad)."""
         if self.images_data:
             return self.images_data[self.current_image_index]['image_path']
         return None
 
     @property
     def is_pdf(self):
-        """Gibt zurück ob das aktuelle Bild ein PDF ist"""
+        """Gibt True zurück, wenn das aktuelle Bild aus einem PDF stammt."""
         if self.images_data:
             return self.images_data[self.current_image_index]['is_pdf']
         return False
 
     @property
     def extracted_image_path(self):
-        """Gibt den extrahierten Pfad zurück (bei PDF)"""
+        """Gibt den Pfad des aus einem PDF extrahierten Bildes zurück, oder None."""
         if self.images_data:
             return self.images_data[self.current_image_index]['extracted_path']
         return None
 
     @property
     def original_image(self):
-        """Gibt das Original PIL Image des aktuellen Bildes zurück"""
+        """Gibt das unskalierte PIL.Image des aktuellen Bildes zurück."""
         if self.images_data:
             return self.images_data[self.current_image_index]['original_image']
         return None
 
     @original_image.setter
     def original_image(self, value):
-        """Setzt das Original PIL Image für das aktuelle Bild"""
+        """Setzt das unskalierte PIL.Image für das aktuelle Bild."""
         if self.images_data:
             self.images_data[self.current_image_index]['original_image'] = value
 
     @property
     def scale_factor(self):
-        """Gibt den Skalierungsfaktor des aktuellen Bildes zurück"""
+        """Gibt den aktuellen Skalierungsfaktor (Original -> Canvas) zurück."""
         if self.images_data:
             return self.images_data[self.current_image_index]['scale_factor']
         return 1.0
 
     @scale_factor.setter
     def scale_factor(self, value):
-        """Setzt den Skalierungsfaktor für das aktuelle Bild"""
+        """Setzt den Skalierungsfaktor für das aktuelle Bild."""
         if self.images_data:
             self.images_data[self.current_image_index]['scale_factor'] = value
 
     @property
     def regions(self):
-        """Gibt die Regionen des aktuellen Bildes zurück"""
+        """Gibt die Liste der markierten Regionen des aktuellen Bildes zurück."""
         if self.images_data:
             return self.images_data[self.current_image_index]['regions']
         return []
 
     @regions.setter
     def regions(self, value):
-        """Setzt die Regionen für das aktuelle Bild"""
+        """Setzt die Liste der markierten Regionen für das aktuelle Bild."""
         if self.images_data:
             self.images_data[self.current_image_index]['regions'] = value
 
     def _setup_ui(self):  # pragma: no cover
-        """Erstellt die Benutzeroberfläche"""
+        """Erstellt die tkinter-Benutzeroberfläche.
+
+        Baut Toolbar (Menü, Modus-Auswahl, Aktions-Buttons), Canvas mit
+        Scrollbars für die Bildanzeige, sowie die Bild- und Regionenlisten auf.
+        """
         # Toolbar
         toolbar = tk.Frame(self.root, relief=tk.RAISED, borderwidth=2)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
@@ -184,11 +281,11 @@ class ImageSelectorGUI:
         # Hamburger-Menü Button
         menu_btn = tk.Button(
             toolbar,
-            text="☰",
+            text='☰',
             command=self.show_menu,
-            font=("Arial", 16),
+            font=('Arial', 16),
             width=2,
-            relief=tk.FLAT
+            relief=tk.FLAT,
         )
         menu_btn.pack(side=tk.LEFT, padx=5)
 
@@ -198,42 +295,42 @@ class ImageSelectorGUI:
         )
 
         # Modus-Auswahl
-        tk.Label(toolbar, text="Modus:").pack(side=tk.LEFT, padx=5)
+        tk.Label(toolbar, text='Modus:').pack(side=tk.LEFT, padx=5)
         foto_radio = tk.Radiobutton(
-            toolbar, text="Foto", variable=self.selection_mode, value="foto"
+            toolbar, text='Foto', variable=self.selection_mode, value='foto'
         )
         foto_radio.pack(side=tk.LEFT)
         text_radio = tk.Radiobutton(
-            toolbar, text="Text", variable=self.selection_mode, value="text"
+            toolbar, text='Text', variable=self.selection_mode, value='text'
         )
         text_radio.pack(side=tk.LEFT, padx=5)
 
         # Buttons
         save_current_btn = tk.Button(
             toolbar,
-            text="Auswahl speichern",
+            text='Auswahl speichern',
             command=self.save_current_selection,
-            bg="#4CAF50",
-            fg="white",
+            bg='#4CAF50',
+            fg='white',
         )
         save_current_btn.pack(side=tk.LEFT, padx=20)
 
         finish_btn = tk.Button(
             toolbar,
-            text="✓ Fertig & Exportieren",
+            text='✓ Fertig & Exportieren',
             command=self.finish_selection,
-            bg="#2196F3",
-            fg="white",
-            font=("Arial", 10, "bold"),
+            bg='#2196F3',
+            fg='white',
+            font=('Arial', 10, 'bold'),
         )
         finish_btn.pack(side=tk.LEFT, padx=5)
 
         clear_btn = tk.Button(
             toolbar,
-            text="Bereiche löschen",
+            text='Bereiche löschen',
             command=self.clear_regions,
-            bg="#f44336",
-            fg="white",
+            bg='#f44336',
+            fg='white',
         )
         clear_btn.pack(side=tk.LEFT, padx=5)
 
@@ -251,7 +348,7 @@ class ImageSelectorGUI:
         # Canvas
         self.canvas = tk.Canvas(
             canvas_frame,
-            bg="gray",
+            bg='gray',
             xscrollcommand=self.h_scroll.set,
             yscrollcommand=self.v_scroll.set,
         )
@@ -261,14 +358,14 @@ class ImageSelectorGUI:
         self.v_scroll.config(command=self.canvas.yview)
 
         # Mouse Events
-        self.canvas.bind("<ButtonPress-1>", self.on_mouse_down)
-        self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
-        self.canvas.bind("<ButtonRelease-1>", self.on_mouse_up)
+        self.canvas.bind('<ButtonPress-1>', self.on_mouse_down)
+        self.canvas.bind('<B1-Motion>', self.on_mouse_drag)
+        self.canvas.bind('<ButtonRelease-1>', self.on_mouse_up)
 
         # Statusleiste
         self.status_bar = tk.Label(
             self.root,
-            text="Bereit - Ziehen Sie mit der Maus einen Bereich auf",
+            text='Bereit - Ziehen Sie mit der Maus einen Bereich auf',
             relief=tk.SUNKEN,
             anchor=tk.W,
         )
@@ -283,7 +380,7 @@ class ImageSelectorGUI:
         image_list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
         tk.Label(
-            image_list_frame, text="Geladene Bilder:", font=("Arial", 10, "bold")
+            image_list_frame, text='Geladene Bilder:', font=('Arial', 10, 'bold')
         ).pack()
 
         self.image_listbox = tk.Listbox(image_list_frame, width=25)
@@ -294,9 +391,9 @@ class ImageSelectorGUI:
         # Image navigation label (shows current image)
         self.image_nav_label = tk.Label(
             image_list_frame,
-            text=f"Bild 1/{len(self.images_data)}",
-            font=("Arial", 9, "bold"),
-            fg="#555"
+            text=f'Bild 1/{len(self.images_data)}',
+            font=('Arial', 9, 'bold'),
+            fg='#555',
         )
         self.image_nav_label.pack(pady=5)
 
@@ -305,14 +402,14 @@ class ImageSelectorGUI:
         region_list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
         tk.Label(
-            region_list_frame, text="Gespeicherte Bereiche:", font=("Arial", 10, "bold")
+            region_list_frame, text='Gespeicherte Bereiche:', font=('Arial', 10, 'bold')
         ).pack()
 
         self.region_listbox = tk.Listbox(region_list_frame, width=25)
         self.region_listbox.pack(fill=tk.BOTH, expand=True)
 
     def _load_current_image(self):  # pragma: no cover
-        """Lädt das aktuell ausgewählte Bild"""
+        """Lädt das aktuell ausgewählte Bild."""
         try:
             # Lade PIL Image wenn noch nicht geladen
             if self.original_image is None:
@@ -327,22 +424,25 @@ class ImageSelectorGUI:
                 canvas_width = 1600  # 25% größer als 1280
                 canvas_height = 1280  # 25% größer als 1024
                 img_width, img_height = self.original_image.size
-                self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
+                self.scale_factor = self.compute_scale(
+                    img_width, img_height, canvas_width, canvas_height
+                )
                 # Precompute a resized image for downstream processing if desired
                 new_width = int(img_width * self.scale_factor)
                 new_height = int(img_height * self.scale_factor)
-                self.image = self.original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                self.image = self.original_image.resize(
+                    (new_width, new_height), Image.Resampling.LANCZOS
+                )
         except Exception as e:
             if self.create_ui:
-                messagebox.showerror("Fehler", f"Bild konnte nicht geladen werden: {e}")
+                messagebox.showerror('Fehler', f'Bild konnte nicht geladen werden: {e}')
                 self.root.destroy()
             else:
                 raise
 
     def _display_image(self):  # pragma: no cover
-        """Zeigt das Bild auf dem Canvas an"""
+        """Zeigt das Bild auf dem Canvas an."""
         if self.original_image:
-            # Skalierung berechnen
             # Skalierung berechnen
             self.root.update()
             canvas_width = self.canvas.winfo_width()
@@ -354,22 +454,26 @@ class ImageSelectorGUI:
                 canvas_height = 1280  # 25% größer als 1024
 
             img_width, img_height = self.original_image.size
-            self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
+            self.scale_factor = self.compute_scale(
+                img_width, img_height, canvas_width, canvas_height
+            )
 
             new_width = int(img_width * self.scale_factor)
             new_height = int(img_height * self.scale_factor)
 
-            self.image = self.original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            self.image = self.original_image.resize(
+                (new_width, new_height), Image.Resampling.LANCZOS
+            )
             self.photo = ImageTk.PhotoImage(self.image)
 
             self.canvas.config(scrollregion=(0, 0, new_width, new_height))
-            self.canvas.delete("all")
+            self.canvas.delete('all')
             self.canvas_image = self.canvas.create_image(
                 0, 0, anchor=tk.NW, image=self.photo
             )
 
     def _update_image_list(self):  # pragma: no cover
-        """Aktualisiert die Bildliste"""
+        """Aktualisiert die Bildliste in der GUI."""
         if not self.create_ui:
             return
 
@@ -377,33 +481,33 @@ class ImageSelectorGUI:
         for idx, img_data in enumerate(self.images_data):
             base_name = os.path.basename(img_data['original_path'])
             if img_data['is_pdf']:
-                base_name += " (PDF)"
+                base_name += ' (PDF)'
             region_count = len(img_data['regions'])
-            marker = "▶ " if idx == self.current_image_index else "  "
-            self.image_listbox.insert(tk.END, f"{marker}{base_name} [{region_count} Bereiche]")
+            marker = '▶ ' if idx == self.current_image_index else '  '
+            self.image_listbox.insert(
+                tk.END, f'{marker}{base_name} [{region_count} Bereiche]'
+            )
             if idx == self.current_image_index:
                 self.image_listbox.selection_set(idx)
 
     def add_image(self):  # pragma: no cover
-        """Öffnet Dialog zum Hinzufügen eines neuen Bildes"""
+        """Öffnet einen Dateidialog zum Hinzufügen eines neuen Bildes."""
         from .utils import get_working_dir
 
         file_types = [
-            ("Alle unterstützten Formate", "*.png *.jpg *.jpeg *.bmp *.gif *.pdf"),
-            ("Bilddateien", "*.png *.jpg *.jpeg *.bmp *.gif"),
-            ("PDF-Dateien", "*.pdf"),
-            ("Alle Dateien", "*.*")
+            ('Alle unterstützten Formate', '*.png *.jpg *.jpeg *.bmp *.gif *.pdf'),
+            ('Bilddateien', '*.png *.jpg *.jpeg *.bmp *.gif'),
+            ('PDF-Dateien', '*.pdf'),
+            ('Alle Dateien', '*.*'),
         ]
 
         # Standardverzeichnis ist working_dir/Eingang
-        eingang_dir = os.path.join(get_working_dir(), "Eingang")
+        eingang_dir = os.path.join(get_working_dir(), 'Eingang')
         if not os.path.exists(eingang_dir):
             eingang_dir = get_working_dir()
 
         file_path = filedialog.askopenfilename(
-            title="Bild hinzufügen",
-            filetypes=file_types,
-            initialdir=eingang_dir
+            title='Bild hinzufügen', filetypes=file_types, initialdir=eingang_dir
         )
 
         if file_path:
@@ -411,13 +515,17 @@ class ImageSelectorGUI:
                 self._add_image(file_path)
                 self._update_image_list()
                 # Update navigation label
-                self.image_nav_label.config(text=f"Bild {self.current_image_index + 1}/{len(self.images_data)}")
-                self.status_bar.config(text=f"✓ Bild hinzugefügt: {os.path.basename(file_path)}")
+                self.image_nav_label.config(
+                    text=f'Bild {self.current_image_index + 1}/{len(self.images_data)}'
+                )
+                self.status_bar.config(
+                    text=f'✓ Bild hinzugefügt: {os.path.basename(file_path)}'
+                )
             except Exception as e:
-                messagebox.showerror("Fehler", f"Konnte Bild nicht hinzufügen: {e}")
+                messagebox.showerror('Fehler', f'Konnte Bild nicht hinzufügen: {e}')
 
     def on_image_select(self, event):  # pragma: no cover
-        """Wird aufgerufen wenn ein Bild in der Liste ausgewählt wird"""
+        """Wird aufgerufen, wenn ein Bild in der Liste ausgewählt wird."""
         selection = self.image_listbox.curselection()
         if selection:
             new_index = selection[0]
@@ -425,7 +533,7 @@ class ImageSelectorGUI:
                 self._switch_to_image(new_index)
 
     def _switch_to_image(self, index: int):  # pragma: no cover
-        """Wechselt zum Bild mit dem angegebenen Index"""
+        """Wechselt zum Bild mit dem angegebenen Index."""
         if 0 <= index < len(self.images_data):
             # Aktuelle Auswahl verwerfen
             if self.current_rect:
@@ -442,42 +550,44 @@ class ImageSelectorGUI:
             # Regions-Liste aktualisieren
             self.region_listbox.delete(0, tk.END)
             for i, region in enumerate(self.regions, 1):
-                coords = region["coords"]
-                mode = region["mode"]
+                coords = region['coords']
+                mode = region['mode']
                 x1, y1, x2, y2 = coords
-                list_text = f"{i}. {mode.upper()} ({int(x2 - x1)}x{int(y2 - y1)})"
+                list_text = f'{i}. {mode.upper()} ({int(x2 - x1)}x{int(y2 - y1)})'
                 self.region_listbox.insert(tk.END, list_text)
 
             # Bildliste und Navigation aktualisieren
             self._update_image_list()
-            self.image_nav_label.config(text=f"Bild {index + 1}/{len(self.images_data)}")
+            self.image_nav_label.config(
+                text=f'Bild {index + 1}/{len(self.images_data)}'
+            )
 
             # Statusmeldung
             img_name = os.path.basename(self.original_image_path)
-            self.status_bar.config(text=f"Gewechselt zu: {img_name}")
+            self.status_bar.config(text=f'Gewechselt zu: {img_name}')
 
     def show_menu(self):  # pragma: no cover
-        """Zeigt das Hamburger-Menü an"""
+        """Zeigt das Hamburger-Menü an."""
         menu = tk.Menu(self.root, tearoff=0)
 
         # Multi-Image Menü
-        menu.add_command(label="🖼️ Bilder verwalten", state="disabled")
-        menu.add_command(label="  ➕ Bild hinzufügen", command=self.add_image)
+        menu.add_command(label='🖼️ Bilder verwalten', state='disabled')
+        menu.add_command(label='  ➕ Bild hinzufügen', command=self.add_image)
 
         menu.add_separator()
 
         # Rotation-Menü
-        menu.add_command(label="🔄 Bild drehen", state="disabled")
-        menu.add_command(label="  ↺ 90° links", command=lambda: self.rotate_image(-90))
-        menu.add_command(label="  ↻ 90° rechts", command=lambda: self.rotate_image(90))
-        menu.add_command(label="  ↻ 180°", command=lambda: self.rotate_image(180))
+        menu.add_command(label='🔄 Bild drehen', state='disabled')
+        menu.add_command(label='  ↺ 90° links', command=lambda: self.rotate_image(-90))
+        menu.add_command(label='  ↻ 90° rechts', command=lambda: self.rotate_image(90))
+        menu.add_command(label='  ↻ 180°', command=lambda: self.rotate_image(180))
 
         menu.add_separator()
-        menu.add_command(label="📖 Hilfe", command=self.show_help)
+        menu.add_command(label='📖 Hilfe', command=self.show_help)
         menu.add_separator()
-        menu.add_command(label="ℹ️ Über", command=self.show_about)
+        menu.add_command(label='ℹ️ Über', command=self.show_about)
         menu.add_separator()
-        menu.add_command(label="🚪 Beenden", command=self.on_closing)
+        menu.add_command(label='🚪 Beenden', command=self.on_closing)
 
         # Menü an der Mausposition anzeigen
         try:
@@ -486,10 +596,10 @@ class ImageSelectorGUI:
             menu.grab_release()
 
     def show_help(self):  # pragma: no cover
-        """Zeigt das modale Hilfefenster an"""
+        """Zeigt das modale Hilfefenster an."""
         help_window = tk.Toplevel(self.root)
-        help_window.title("Hilfe - Bildausschnitt-Selector")
-        help_window.geometry("500x450")
+        help_window.title('Hilfe - Bildausschnitt-Selector')
+        help_window.geometry('500x450')
         help_window.resizable(False, False)
 
         # Fenster modal machen
@@ -500,14 +610,14 @@ class ImageSelectorGUI:
         help_window.update_idletasks()
         x = (help_window.winfo_screenwidth() // 2) - (500 // 2)
         y = (help_window.winfo_screenheight() // 2) - (450 // 2)
-        help_window.geometry(f"500x450+{x}+{y}")
+        help_window.geometry(f'500x450+{x}+{y}')
 
         # Titel
         title_label = tk.Label(
             help_window,
-            text="🖼️ Bildausschnitt-Selector",
-            font=("Arial", 16, "bold"),
-            pady=10
+            text='🖼️ Bildausschnitt-Selector',
+            font=('Arial', 16, 'bold'),
+            pady=10,
         )
         title_label.pack()
 
@@ -522,9 +632,9 @@ class ImageSelectorGUI:
             text_frame,
             wrap=tk.WORD,
             yscrollcommand=scrollbar.set,
-            font=("Arial", 10),
+            font=('Arial', 10),
             padx=10,
-            pady=10
+            pady=10,
         )
         help_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=help_text.yview)
@@ -591,18 +701,18 @@ Beispiel:
 6. "Fertig & Exportieren" → Alle werden exportiert
         """
 
-        help_text.insert("1.0", help_content)
+        help_text.insert('1.0', help_content)
         help_text.config(state=tk.DISABLED)  # Readonly
 
         # Schließen-Button
         close_btn = tk.Button(
             help_window,
-            text="Schließen",
+            text='Schließen',
             command=help_window.destroy,
-            bg="#2196F3",
-            fg="white",
-            font=("Arial", 10, "bold"),
-            width=15
+            bg='#2196F3',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            width=15,
         )
         close_btn.pack(pady=10)
 
@@ -610,10 +720,10 @@ Beispiel:
         help_window.focus_set()
 
     def show_about(self):  # pragma: no cover
-        """Zeigt das Über-Fenster an"""
+        """Zeigt das Über-Fenster an."""
         about_window = tk.Toplevel(self.root)
-        about_window.title("Über")
-        about_window.geometry("400x250")
+        about_window.title('Über')
+        about_window.geometry('400x250')
         about_window.resizable(False, False)
 
         # Fenster modal machen
@@ -624,14 +734,10 @@ Beispiel:
         about_window.update_idletasks()
         x = (about_window.winfo_screenwidth() // 2) - (400 // 2)
         y = (about_window.winfo_screenheight() // 2) - (250 // 2)
-        about_window.geometry(f"400x250+{x}+{y}")
+        about_window.geometry(f'400x250+{x}+{y}')
 
         # Icon/Titel
-        title_label = tk.Label(
-            about_window,
-            text="🖼️",
-            font=("Arial", 48)
-        )
+        title_label = tk.Label(about_window, text='🖼️', font=('Arial', 48))
         title_label.pack(pady=10)
 
         # Info-Text
@@ -647,27 +753,24 @@ MIT License
         """
 
         info_label = tk.Label(
-            about_window,
-            text=info_text,
-            font=("Arial", 10),
-            justify=tk.CENTER
+            about_window, text=info_text, font=('Arial', 10), justify=tk.CENTER
         )
         info_label.pack(pady=10)
 
         # Schließen-Button
         close_btn = tk.Button(
             about_window,
-            text="OK",
+            text='OK',
             command=about_window.destroy,
-            bg="#2196F3",
-            fg="white",
-            font=("Arial", 10, "bold"),
-            width=10
+            bg='#2196F3',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            width=10,
         )
         close_btn.pack(pady=10)
 
     def on_mouse_down(self, event):  # pragma: no cover
-        """Maus-Klick Event"""
+        """Verarbeitet das Maus-Klick-Event auf dem Canvas."""
         if self.image:
             self.start_x = self.canvas.canvasx(event.x)
             self.start_y = self.canvas.canvasy(event.y)
@@ -676,7 +779,7 @@ MIT License
                 self.canvas.delete(self.current_rect)
 
     def on_mouse_drag(self, event):  # pragma: no cover
-        """Maus-Zieh Event"""
+        """Verarbeitet das Maus-Zieh-Event und zeichnet das Auswahlrechteck."""
         if self.image and self.start_x is not None:
             cur_x = self.canvas.canvasx(event.x)
             cur_y = self.canvas.canvasy(event.y)
@@ -684,7 +787,7 @@ MIT License
             if self.current_rect:
                 self.canvas.delete(self.current_rect)
 
-            color = "blue" if self.selection_mode.get() == "foto" else "green"
+            color = 'blue' if self.selection_mode.get() == 'foto' else 'green'
 
             self.current_rect = self.canvas.create_rectangle(
                 self.start_x,
@@ -697,7 +800,7 @@ MIT License
             )
 
     def on_mouse_up(self, event):  # pragma: no cover
-        """Maus-Loslassen Event"""
+        """Verarbeitet das Maus-Loslassen-Event und speichert die Auswahl."""
         if self.image and self.start_x is not None:
             end_x = self.canvas.canvasx(event.x)
             end_y = self.canvas.canvasy(event.y)
@@ -710,7 +813,7 @@ MIT License
             if abs(x2 - x1) > 5 and abs(y2 - y1) > 5:
                 self.current_selection = (x1, y1, x2, y2)
                 self.status_bar.config(
-                    text=f"Auswahl: {int(x2 - x1)}x{int(y2 - y1)} px - "
+                    text=f'Auswahl: {int(x2 - x1)}x{int(y2 - y1)} px - '
                     f"Klicken Sie 'Auswahl speichern' zum Hinzufügen"
                 )
             else:
@@ -720,32 +823,33 @@ MIT License
                 self.current_selection = None
 
     def save_current_selection(self):
-        """Speichert die aktuelle Auswahl"""
+        """Speichert die aktuelle Auswahl als Region in der Regionenliste."""
         if self.current_selection is None:
             messagebox.showwarning(
-                "Keine Auswahl", "Bitte wählen Sie zuerst einen Bereich aus."
+                'Keine Auswahl', 'Bitte wählen Sie zuerst einen Bereich aus.'
             )
             return
 
         mode = self.selection_mode.get()
         region = {
-            "coords": self.current_selection,
-            "mode": mode,
-            "rect_id": self.current_rect,
+            'coords': self.current_selection,
+            'mode': mode,
+            'rect_id': self.current_rect,
         }
 
         self.regions.append(region)
 
         x1, y1, x2, y2 = self.current_selection
-        list_text = f"{len(self.regions)}. {mode.upper()} ({int(x2 - x1)}x{int(y2 - y1)})"
+        list_text = (
+            f'{len(self.regions)}. {mode.upper()} ({int(x2 - x1)}x{int(y2 - y1)})'
+        )
         self.region_listbox.insert(tk.END, list_text)
 
         self.status_bar.config(
-            text=f"✓ Bereich {len(self.regions)} gespeichert ({mode})"
+            text=f'✓ Bereich {len(self.regions)} gespeichert ({mode})'
         )
 
         if self.current_rect:
-            # color = "blue" if mode == "foto" else "green"
             self.canvas.itemconfig(self.current_rect, dash=())
 
         self.current_rect = None
@@ -756,20 +860,24 @@ MIT License
             self._update_image_list()
 
     def clear_regions(self):  # pragma: no cover
-        """Löscht alle gespeicherten Bereiche"""
+        """Löscht alle gespeicherten Bereiche des aktuellen Bildes."""
         if self.regions:
-            if messagebox.askyesno("Bestätigen", "Alle Bereiche löschen?"):
+            if messagebox.askyesno('Bestätigen', 'Alle Bereiche löschen?'):
                 for region in self.regions:
-                    if region["rect_id"]:
-                        self.canvas.delete(region["rect_id"])
+                    if region['rect_id']:
+                        self.canvas.delete(region['rect_id'])
                 self.regions = []
                 self.region_listbox.delete(0, tk.END)
-                self.status_bar.config(text="Alle Bereiche gelöscht")
+                self.status_bar.config(text='Alle Bereiche gelöscht')
                 # Update image list to show cleared region count
                 self._update_image_list()
 
     def rotate_image(self, angle: int):  # pragma: no cover
-        """Dreht das Bild um den angegebenen Winkel (90, -90, oder 180 Grad)"""
+        """Dreht das aktuelle Bild und setzt dabei alle Bereiche zurück.
+
+        Args:
+            angle: Drehwinkel in Grad (90 = rechts, -90 = links, 180).
+        """
         if not self.original_image:
             return
 
@@ -799,8 +907,8 @@ MIT License
         if self.regions:
             if self.create_ui:
                 for region in self.regions:
-                    if region["rect_id"]:
-                        self.canvas.delete(region["rect_id"])
+                    if region['rect_id']:
+                        self.canvas.delete(region['rect_id'])
                 self.region_listbox.delete(0, tk.END)
             self.regions = []
 
@@ -808,47 +916,61 @@ MIT License
         if self.create_ui:
             self._display_image()
             # Update status
-            rotation_text = "90° rechts" if angle == 90 else ("90° links" if angle == -90 else "180°")
-            self.status_bar.config(text=f"Bild um {rotation_text} gedreht - Bereiche wurden zurückgesetzt")
+            rotation_text = (
+                '90° rechts'
+                if angle == 90
+                else ('90° links' if angle == -90 else '180°')
+            )
+            self.status_bar.config(
+                text=f'Bild um {rotation_text} gedreht - Bereiche wurden zurückgesetzt'
+            )
         else:
             # Update scale factor and resized image for non-GUI mode
             img_width, img_height = self.original_image.size
             canvas_width = 1600  # 25% größer als 1280
             canvas_height = 1280  # 25% größer als 1024
-            self.scale_factor = self.compute_scale(img_width, img_height, canvas_width, canvas_height)
+            self.scale_factor = self.compute_scale(
+                img_width, img_height, canvas_width, canvas_height
+            )
             new_width = int(img_width * self.scale_factor)
             new_height = int(img_height * self.scale_factor)
-            self.image = self.original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            self.image = self.original_image.resize(
+                (new_width, new_height), Image.Resampling.LANCZOS
+            )
 
     def finish_selection(self):  # pragma: no cover
-        """Beendet die Auswahl und exportiert"""
+        """Beendet die Auswahl und startet den Export aller markierten Bereiche."""
         # Zähle alle Regionen von allen Bildern
         total_regions = sum(len(img_data['regions']) for img_data in self.images_data)
 
         if total_regions == 0:
             messagebox.showwarning(
-                "Keine Bereiche", "Bitte wählen Sie mindestens einen Bereich aus."
+                'Keine Bereiche', 'Bitte wählen Sie mindestens einen Bereich aus.'
             )
             return
 
-        message = f"{total_regions} Bereiche von {len(self.images_data)} Bild(ern) exportieren?"
-        if messagebox.askyesno("Bestätigen", message):
+        message = f'{total_regions} Bereiche von {len(self.images_data)} Bild(ern) exportieren?'
+        if messagebox.askyesno('Bestätigen', message):
             self.result_ready = True
             self.root.quit()
             self.root.destroy()
 
     def on_closing(self):  # pragma: no cover
-        """Wird beim Schließen des Fensters aufgerufen"""
+        """Wird beim Schließen des Fensters aufgerufen."""
         if messagebox.askokcancel(
-            "Beenden",
-            "Möchten Sie wirklich beenden? Nicht exportierte Bereiche gehen verloren.",
+            'Beenden',
+            'Möchten Sie wirklich beenden? Nicht exportierte Bereiche gehen verloren.',
         ):
             self.result_ready = False
             self.root.quit()
             self.root.destroy()
 
     def run(self):
-        """Startet die GUI und gibt alle Bilder mit ihren Regionen zurück"""
+        """Startet die GUI-Mainloop und gibt die Bilddaten mit Regionen zurück.
+
+        Returns:
+            Liste der images_data-Dicts bei erfolgreichem Export, sonst None.
+        """
         self.root.mainloop()
         if self.result_ready:
             # Gebe alle Bilder mit ihren Regionen zurück

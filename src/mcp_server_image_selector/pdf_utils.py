@@ -1,6 +1,4 @@
-"""
-PDF-Utility-Funktionen für die Bildextraktion
-"""
+"""PDF-Utility-Funktionen für die Bildextraktion."""
 
 import os
 import sys
@@ -25,7 +23,9 @@ def extract_image_from_pdf(pdf_path: str) -> Optional[str]:
     from .utils import create_tmp_dir_if_needed
 
     if fitz is None:
-        raise ImportError("PyMuPDF (fitz) ist nicht installiert. Bitte installieren: pip install PyMuPDF")
+        raise ImportError(
+            'PyMuPDF (fitz) ist nicht installiert. Bitte installieren: pip install PyMuPDF'
+        )
 
     try:
         doc = fitz.open(pdf_path)
@@ -44,11 +44,11 @@ def extract_image_from_pdf(pdf_path: str) -> Optional[str]:
             # Nimm das erste Bild
             xref = image_list[0][0]
             base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
+            image_bytes = base_image['image']
 
-            output_path = os.path.join(output_dir, f"{base_name}_extracted.png")
+            output_path = os.path.join(output_dir, f'{base_name}_extracted.png')
 
-            with open(output_path, "wb") as img_file:
+            with open(output_path, 'wb') as img_file:
                 img_file.write(image_bytes)
 
             doc.close()
@@ -59,12 +59,12 @@ def extract_image_from_pdf(pdf_path: str) -> Optional[str]:
             mat = fitz.Matrix(2.0, 2.0)  # 2x Zoom = 144 DPI
             pix = page.get_pixmap(matrix=mat)
 
-            output_path = os.path.join(output_dir, f"{base_name}_rendered.png")
+            output_path = os.path.join(output_dir, f'{base_name}_rendered.png')
 
             pix.save(output_path)
             doc.close()
             return output_path
 
     except Exception as e:
-        print(f"Fehler beim Extrahieren des Bildes aus PDF: {e}", file=sys.stderr)
+        print(f'Fehler beim Extrahieren des Bildes aus PDF: {e}', file=sys.stderr)
         return None

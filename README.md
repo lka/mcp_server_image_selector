@@ -8,6 +8,7 @@ Der MCP Server Image Selector ermöglicht es, **mehrere Bilder in einer Session*
 
 ## Features
 - Interaktive GUI zur Auswahl von Bild- und Textregionen
+- **Auto-Load**: Ohne Bildpfad werden automatisch die ersten 4 Bilder aus dem Bildverzeichnis geladen
 - **Multi-Bild-Unterstützung**: Mehrere Bilder in einer GUI-Sitzung bearbeiten
 - Unterstützung für verschiedene Bildformate (JPEG, PNG, BMP, GIF)
 - **PDF-Unterstützung**: Automatische Extraktion von eingebetteten Bildern oder Rendering der ersten Seite
@@ -77,11 +78,11 @@ Für automatische Texterkennung in Text-Bereichen ist Tesseract OCR optional ver
 
 ### Standalone-Modus (nur GUI, ohne MCP)
 ```bash
-# Ohne Bildpfad - öffnet Dateiauswahl-Dialog
-python src/mcp_server_image_selector/server.py --standalone
+# Ohne Bildpfad - lädt automatisch die ersten 4 Bilddateien aus dem Arbeitsverzeichnis
+python -m mcp_server_image_selector.server --standalone
 
 # Mit Bildpfad
-python src/mcp_server_image_selector/server.py --standalone pfad/zum/bild.jpg
+python -m mcp_server_image_selector.server --standalone pfad/zum/bild.jpg
 
 # Alternative: Beispiel-Script verwenden
 python example_standalone.py

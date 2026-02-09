@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venvScriptspython.exe -m flake8:*)",
+      "Bash(powershell:*)"
+    ]
+  }
+}

@@ -1,1 +1,1 @@
-# MCP Server image selector
+"""MCP Server für interaktive Bildausschnitt-Selektion unter Windows."""
