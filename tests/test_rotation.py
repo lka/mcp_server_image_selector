@@ -25,7 +25,9 @@ if "mcp" not in sys.modules:
 
 from mcp_server_image_selector.gui import ImageSelectorGUI
 
-TEST_IMAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Scan20250919130047_1.jpeg"))
+TEST_IMAGE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "Scan20250919130047_1.jpeg")
+)
 
 
 def test_rotate_image_90_degrees_right(tmp_path):
@@ -89,7 +91,7 @@ def test_rotate_image_clears_regions(tmp_path):
         # Add some mock regions
         gui.regions = [
             {"coords": (10, 10, 100, 100), "mode": "foto", "rect_id": None},
-            {"coords": (200, 200, 300, 300), "mode": "text", "rect_id": None}
+            {"coords": (200, 200, 300, 300), "mode": "text", "rect_id": None},
         ]
 
         # Set current selection
@@ -163,18 +165,11 @@ def test_export_with_rotated_image(tmp_path):
 
         # Create a test region that covers a portion of the rotated image
         # Using coordinates relative to rotated image
-        test_region = {
-            "coords": (10, 10, 100, 100),
-            "mode": "foto",
-            "rect_id": None
-        }
+        test_region = {"coords": (10, 10, 100, 100), "mode": "foto", "rect_id": None}
 
         # Export the region with the rotated image
         result = export_regions(
-            TEST_IMAGE,
-            [test_region],
-            str(tmp_path),
-            image_object=gui.original_image
+            TEST_IMAGE, [test_region], str(tmp_path), image_object=gui.original_image
         )
 
         # Verify export was successful

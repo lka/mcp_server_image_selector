@@ -45,7 +45,8 @@ if Server is not None and getattr(Server, '__name__', '') != 'object':
                 'Bei PDFs wird das erste eingebettete Bild extrahiert oder die erste Seite gerendert. '
                 'Bereiche können als "foto" oder "text" markiert werden. '
                 'Ohne image_path werden automatisch die ersten 4 Bilder aus dem Bildverzeichnis geladen. '
-                'Nach Abschluss werden die Bereiche automatisch exportiert.',
+                'Nach Abschluss werden die Bereiche automatisch exportiert. '
+                'Alle erkannten Texte werden alphabetisch konkateniert und als full_recipe_text in der Antwort zurückgegeben.',
                 inputSchema={
                     'type': 'object',
                     'properties': {
@@ -160,6 +161,27 @@ if 'app' in globals():
 
                         response += f'\nAusgabeverzeichnis: {export_dir}'
 
+                        # Alle Text-Dateien alphabetisch konkatenieren
+                        text_files = sorted(
+                            [
+                                fi['text_file']
+                                for fi in all_exported_files
+                                if fi['type'] == 'text'
+                            ],
+                            key=lambda p: os.path.basename(p),
+                        )
+                        if text_files:
+                            full_text_parts = []
+                            for tf in text_files:
+                                try:
+                                    with open(tf, 'r', encoding='utf-8') as f:
+                                        full_text_parts.append(f.read().strip())
+                                except OSError:
+                                    pass
+                            if full_text_parts:
+                                response += '\n\n--- full_recipe_text ---\n'
+                                response += '\n\n'.join(full_text_parts)
+
                         return [TextContent(type='text', text=response)]
                     else:
                         return [
@@ -272,6 +294,27 @@ def run_standalone(image_path: str = None):
                         print(f"    - Text: {os.path.basename(file_info['text_file'])}")
 
                 print(f'\nAusgabeverzeichnis: {export_dir}')
+
+                # Alle Text-Dateien alphabetisch konkatenieren
+                text_files = sorted(
+                    [
+                        fi['text_file']
+                        for fi in all_exported_files
+                        if fi['type'] == 'text'
+                    ],
+                    key=lambda p: os.path.basename(p),
+                )
+                if text_files:
+                    full_text_parts = []
+                    for tf in text_files:
+                        try:
+                            with open(tf, 'r', encoding='utf-8') as f:
+                                full_text_parts.append(f.read().strip())
+                        except OSError:
+                            pass
+                    if full_text_parts:
+                        print('\n--- full_recipe_text ---')
+                        print('\n\n'.join(full_text_parts))
             else:
                 print('Keine Bereiche zum Exportieren ausgewählt')
         else:

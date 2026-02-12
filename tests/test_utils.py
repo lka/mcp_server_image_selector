@@ -4,11 +4,17 @@ Tests für Utility-Funktionen (utils.py und export.py)
 
 import os
 import shutil
-from mcp_server_image_selector.utils import create_tmp_dir_if_needed, cleanup_tmp_dir, get_working_dir, transform_coords
+from mcp_server_image_selector.utils import (
+    create_tmp_dir_if_needed,
+    cleanup_tmp_dir,
+    get_working_dir,
+    transform_coords,
+)
 from mcp_server_image_selector.export import format_export_paths
 
 
 # Tests für Verzeichnis-Funktionen
+
 
 def test_create_tmp_dir_if_needed(tmp_path, monkeypatch):
     # Set up temporary working directory
@@ -99,6 +105,7 @@ def test_cleanup_tmp_dir_nonexistent(tmp_path, monkeypatch):
 
 # Tests für Koordinaten-Transformation
 
+
 def test_transform_coords_normal():
     coords = (100, 100, 200, 200)
     scaled = transform_coords(coords, 2.0)
@@ -115,6 +122,7 @@ def test_transform_coords_zero_scale():
 
 
 # Tests für Export-Pfade
+
 
 def test_format_export_paths_foto(tmp_path):
     base = "img"

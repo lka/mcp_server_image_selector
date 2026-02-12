@@ -25,7 +25,9 @@ if "mcp" not in sys.modules:
 
 from mcp_server_image_selector.gui import ImageSelectorGUI
 
-TEST_IMAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Scan20250919130047_1.jpeg"))
+TEST_IMAGE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "Scan20250919130047_1.jpeg")
+)
 
 
 def test_load_image_sets_original_image(tmp_path):

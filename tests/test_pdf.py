@@ -29,12 +29,15 @@ from mcp_server_image_selector.export import export_regions
 
 try:
     import fitz  # PyMuPDF
+
     PYMUPDF_AVAILABLE = True
 except ImportError:
     PYMUPDF_AVAILABLE = False
 
 
-def create_test_pdf_with_image(pdf_path, image_size=(400, 300), image_color=(0, 0, 255)):
+def create_test_pdf_with_image(
+    pdf_path, image_size=(400, 300), image_color=(0, 0, 255)
+):
     """Creates a simple PDF with an embedded image using PyMuPDF."""
     if not PYMUPDF_AVAILABLE:
         return False
@@ -52,7 +55,9 @@ def create_test_pdf_with_image(pdf_path, image_size=(400, 300), image_color=(0, 
         temp_img.save(temp_img_path, "PNG")
 
         # Insert the image into the PDF
-        page.insert_image(fitz.Rect(0, 0, image_size[0], image_size[1]), filename=temp_img_path)
+        page.insert_image(
+            fitz.Rect(0, 0, image_size[0], image_size[1]), filename=temp_img_path
+        )
 
         # Save the PDF
         doc.save(pdf_path)
@@ -105,7 +110,9 @@ def test_extract_image_from_pdf_with_embedded_image(tmp_path, monkeypatch):
     pdf_path = os.path.join(base_dir, "test_with_image.pdf")
 
     # Create a test PDF with an embedded image
-    success = create_test_pdf_with_image(pdf_path, image_size=(400, 300), image_color=(0, 0, 255))
+    success = create_test_pdf_with_image(
+        pdf_path, image_size=(400, 300), image_color=(0, 0, 255)
+    )
     if not success:
         print("Failed to create test PDF, skipping test")
         return
@@ -115,7 +122,9 @@ def test_extract_image_from_pdf_with_embedded_image(tmp_path, monkeypatch):
 
     # Verify the extraction
     assert extracted_path is not None, "Failed to extract image from PDF"
-    assert os.path.exists(extracted_path), f"Extracted image does not exist at {extracted_path}"
+    assert os.path.exists(
+        extracted_path
+    ), f"Extracted image does not exist at {extracted_path}"
 
     # Verify it's a valid image
     img = Image.open(extracted_path)
@@ -147,7 +156,9 @@ def test_extract_image_from_pdf_text_only(tmp_path, monkeypatch):
 
     # Verify the rendering
     assert extracted_path is not None, "Failed to render PDF page"
-    assert os.path.exists(extracted_path), f"Rendered image does not exist at {extracted_path}"
+    assert os.path.exists(
+        extracted_path
+    ), f"Rendered image does not exist at {extracted_path}"
     assert "_rendered.png" in extracted_path, "Output should be a rendered PNG"
 
     # Verify it's a valid image
@@ -170,7 +181,9 @@ def test_image_selector_gui_with_pdf(tmp_path, monkeypatch):
     pdf_path = os.path.join(base_dir, "test_gui.pdf")
 
     # Create a test PDF with an embedded image
-    success = create_test_pdf_with_image(pdf_path, image_size=(600, 400), image_color=(255, 0, 0))
+    success = create_test_pdf_with_image(
+        pdf_path, image_size=(600, 400), image_color=(255, 0, 0)
+    )
     if not success:
         print("Failed to create test PDF, skipping test")
         return
@@ -186,7 +199,9 @@ def test_image_selector_gui_with_pdf(tmp_path, monkeypatch):
 
     # Verify the extracted image is in the tmp directory
     expected_tmp_dir = os.path.join(base_dir, "tmp")
-    assert gui.extracted_image_path.startswith(expected_tmp_dir), f"Extracted image should be in tmp dir, got {gui.extracted_image_path}"
+    assert gui.extracted_image_path.startswith(
+        expected_tmp_dir
+    ), f"Extracted image should be in tmp dir, got {gui.extracted_image_path}"
 
     # Verify the image was loaded
     assert gui.original_image is not None, "Image was not loaded"
@@ -206,7 +221,9 @@ def test_export_regions_from_pdf(tmp_path, monkeypatch):
     pdf_path = os.path.join(base_dir, "test_export.pdf")
 
     # Create a test PDF with an embedded image
-    success = create_test_pdf_with_image(pdf_path, image_size=(400, 300), image_color=(0, 255, 0))
+    success = create_test_pdf_with_image(
+        pdf_path, image_size=(400, 300), image_color=(0, 255, 0)
+    )
     if not success:
         print("Failed to create test PDF, skipping test")
         return
@@ -221,19 +238,27 @@ def test_export_regions_from_pdf(tmp_path, monkeypatch):
     ]
 
     # Export regions using the image from PDF
-    result = export_regions(pdf_path, regions, base_dir, image_object=gui.original_image)
+    result = export_regions(
+        pdf_path, regions, base_dir, image_object=gui.original_image
+    )
 
     # Verify export
     assert result["success"] is True, "Export failed"
-    assert result["exported_count"] == 2, f"Expected 2 exports, got {result['exported_count']}"
+    assert (
+        result["exported_count"] == 2
+    ), f"Expected 2 exports, got {result['exported_count']}"
 
     # Check files exist
     for f in result["files"]:
         if f["type"] == "foto":
             assert os.path.exists(f["file"]), f"Foto file does not exist: {f['file']}"
         else:
-            assert os.path.exists(f["image_file"]), f"Text image file does not exist: {f['image_file']}"
-            assert os.path.exists(f["text_file"]), f"Text file does not exist: {f['text_file']}"
+            assert os.path.exists(
+                f["image_file"]
+            ), f"Text image file does not exist: {f['image_file']}"
+            assert os.path.exists(
+                f["text_file"]
+            ), f"Text file does not exist: {f['text_file']}"
 
 
 def test_pdf_with_invalid_file():

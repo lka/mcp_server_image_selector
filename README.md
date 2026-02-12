@@ -14,6 +14,7 @@ Der MCP Server Image Selector ermöglicht es, **mehrere Bilder in einer Session*
 - **PDF-Unterstützung**: Automatische Extraktion von eingebetteten Bildern oder Rendering der ersten Seite
 - **Bild-Rotation**: Bilder können um 90°, -90° oder 180° gedreht werden
 - **OCR-Integration**: Automatische Texterkennung mit Tesseract für Text-Bereiche (optional)
+- **Automatische Textzusammenfassung**: Alle erkannten Texte werden alphabetisch konkateniert und als `full_recipe_text` zurückgegeben
 - Export der ausgewählten Regionen als Bild- und/oder Textdateien
 - Automatische Benennung und Ablage der Exportdateien im tmp-Verzeichnis
 - Integration in MCP-Workflows
@@ -78,7 +79,7 @@ Für automatische Texterkennung in Text-Bereichen ist Tesseract OCR optional ver
 
 ### Standalone-Modus (nur GUI, ohne MCP)
 ```bash
-# Ohne Bildpfad - lädt automatisch die ersten 4 Bilddateien aus dem Arbeitsverzeichnis
+# Ohne Bildpfad - lädt automatisch die ersten 4 Bilddateien aus dem Bildverzeichnis
 python -m mcp_server_image_selector.server --standalone
 
 # Mit Bildpfad
@@ -91,7 +92,7 @@ python example_standalone.py
 ## Benutzung
 
 ### Grundfunktionen
-1. **Bild öffnen**: Der Server startet mit einem initial angegebenen Bild oder PDF
+1. **Bild öffnen**: Ohne Bildpfad werden automatisch die ersten 4 Bilder aus dem Bildverzeichnis geladen. Optional kann ein expliziter Bildpfad angegeben werden.
 2. **Weitere Bilder hinzufügen**: Über den Button "+ Bild hinzufügen" können weitere Bilder zur Session hinzugefügt werden
    - Standardverzeichnis: `working_dir/Eingang` (falls vorhanden)
 3. **Zwischen Bildern wechseln**: Klick auf ein Bild in der Bildliste wechselt zum entsprechenden Bild
@@ -110,14 +111,13 @@ python example_standalone.py
 - Dateinamen enthalten den Bildnamen, Timestamp und Region-Nummer für eindeutige Identifikation
 
 ### Beispiel-Workflow
-1. MCP-Tool mit erstem Bild aufrufen: `select_image_regions("dokument1.jpg")`
-2. GUI öffnet sich mit dokument1.jpg
-3. Bereiche in dokument1.jpg auswählen und speichern
-4. "+ Bild hinzufügen" klicken → dokument2.pdf auswählen
-5. In der Bildliste zwischen den Bildern wechseln
-6. Bereiche in dokument2.pdf auswählen und speichern
-7. "Fertig & Exportieren" klicken
-8. Alle Bereiche von beiden Dokumenten werden exportiert
+1. MCP-Tool aufrufen: `select_image_regions()` (ohne Parameter) oder `select_image_regions("dokument1.jpg")` (mit Bild)
+2. GUI öffnet sich - bei Auto-Load mit den ersten 4 Bildern aus dem Bildverzeichnis
+3. Bereiche auswählen und speichern (Modus "Foto" oder "Text")
+4. Optional: "+ Bild hinzufügen" für weitere Bilder
+5. "Fertig & Exportieren" klicken
+6. Alle Bereiche werden exportiert, Text-Bereiche per OCR erkannt
+7. Die Antwort enthält eine Zusammenfassung sowie `full_recipe_text` mit allen erkannten Texten
 
 **Ergebnis im tmp-Verzeichnis:**
 ```
@@ -125,6 +125,19 @@ dokument1_20250122_143022_region01_foto.png
 dokument1_20250122_143022_region02_text.png
 dokument1_20250122_143022_region02_text.txt
 dokument2_20250122_143022_region01_foto.png
+```
+
+**Beispiel-Antwort (Auszug):**
+```
+✓ Erfolgreich 3 Bereiche von 2 Bild(ern) exportiert:
+  ...
+
+--- full_recipe_text ---
+Textbereich 1
+...
+
+Textbereich 2
+...
 ```
 
 ## MCP Tools
@@ -135,12 +148,14 @@ Der Server stellt folgende MCP-Tools bereit:
 Öffnet die GUI zur interaktiven Auswahl von Bildausschnitten.
 
 **Parameter:**
-- `image_path` (string): Pfad zum Bild oder PDF (relativ zum Working Directory oder absolut)
+- `image_path` (string, optional): Pfad zum Bild oder PDF (relativ zum Working Directory oder absolut). Ohne Angabe werden automatisch die ersten 4 Bilder aus dem Bildverzeichnis geladen.
 
 **Funktionalität:**
-- Startet mit dem angegebenen Bild
+- Ohne `image_path`: Lädt automatisch die ersten 4 Bilder aus dem Bildverzeichnis (`IMAGE_SUBDIRECTORY`)
+- Mit `image_path`: Startet mit dem angegebenen Bild
 - Ermöglicht das Hinzufügen weiterer Bilder während der Session
 - Exportiert alle Regionen von allen bearbeiteten Bildern
+- Alle `_text.txt`-Dateien werden alphabetisch konkateniert und als `full_recipe_text` in der Antwort zurückgegeben
 - Gibt eine Zusammenfassung der exportierten Dateien zurück
 
 ### `list_exported_regions`
@@ -178,6 +193,7 @@ Die Datei `claude_desktop_config.json` enthält die Konfiguration für die Integ
 
 ### Umgebungsvariablen
 - `IMAGE_SELECTOR_WORKING_DIR`: Optionales Working Directory (Standard: aktuelles Verzeichnis)
+- `IMAGE_SUBDIRECTORY`: Optionales Unterverzeichnis für Bilder relativ zum Working Directory (Standard: Working Directory selbst)
 
 ## Entwicklung
 
